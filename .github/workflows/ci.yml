@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Gate: the package must compile and bundle into a valid .app.
+      - run: ./build-app.sh
+
+      - name: Verify bundle
+        run: |
+          test -x TokscaleBar.app/Contents/MacOS/TokscaleBar
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" TokscaleBar.app/Contents/Info.plist
+          codesign --verify --verbose TokscaleBar.app

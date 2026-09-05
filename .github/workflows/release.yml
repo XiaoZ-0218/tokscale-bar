@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Universal (arm64 + x86_64) build; bundle version comes from the tag.
+      - run: VERSION=${GITHUB_REF_NAME#v} ./build-app.sh --universal
+
+      - name: Package
+        run: ditto -c -k --sequesterRsrc --keepParent TokscaleBar.app "TokscaleBar-${GITHUB_REF_NAME}-macOS.zip"
+
+      # Creates the GitHub Release for the tag and uploads the zipped app.
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: TokscaleBar ${{ github.ref_name }}
+          files: TokscaleBar-${{ github.ref_name }}-macOS.zip
+          generate_release_notes: true

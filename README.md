@@ -31,14 +31,18 @@ A lightweight macOS menu bar app that turns your local [tokscale](https://github
 - [tokscale](https://github.com/tokscale/tokscale) CLI installed (`brew install tokscale` or see its repo); auto-detected in `/opt/homebrew/bin` and `/usr/local/bin`
 - Xcode command line tools (Swift 5.9+) to build
 
+### Download
+
+Grab the latest `TokscaleBar-*-macOS.zip` from [Releases](../../releases) (universal binary, Apple Silicon + Intel). The app is ad-hoc signed, so on first launch either right-click → Open, or run `xattr -d com.apple.quarantine TokscaleBar.app`.
+
 ### Build & Run
 
 ```sh
-./build-app.sh        # compile + bundle TokscaleBar.app
+./build-app.sh        # compile + bundle TokscaleBar.app (native arch)
 open TokscaleBar.app  # launch (menu bar only, no Dock icon)
 ```
 
-For development, `swift run` runs it in the foreground.
+For development, `swift run` runs it in the foreground. Releases are built by GitHub Actions: push a `v*` tag and the Release workflow builds a universal binary, packages the zip, and publishes it with generated notes.
 
 ### Debug flags
 
@@ -74,14 +78,20 @@ All data stays local.
 - **数字单位**：英制 `K/M/B` 或 中制 `千/万/亿`
 - **自定义设置**：菜单栏显示内容、刷新间隔（1/5/15 分钟）、登录时启动、tokscale 路径
 
+### 下载
+
+到 [Releases](../../releases) 下载最新的 `TokscaleBar-*-macOS.zip`（通用二进制，同时支持 Apple Silicon 和 Intel）。应用是 ad-hoc 签名，首次打开请右键 → 打开，或执行 `xattr -d com.apple.quarantine TokscaleBar.app`。
+
 ### 构建与运行
 
 需要 macOS 13+、Xcode 命令行工具，以及已安装的 [tokscale](https://github.com/tokscale/tokscale) CLI。
 
 ```sh
-./build-app.sh        # 编译并打包 TokscaleBar.app
+./build-app.sh        # 编译并打包 TokscaleBar.app（本机架构）
 open TokscaleBar.app  # 启动（无 Dock 图标，只看菜单栏）
 ```
+
+发布由 GitHub Actions 自动完成：推送 `v*` 标签即可触发 Release 工作流，自动构建通用二进制、打包 zip 并发布 Release。
 
 ### 文件结构
 
