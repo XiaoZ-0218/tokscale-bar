@@ -7,11 +7,15 @@
 ## 功能
 
 - **菜单栏实时数字**：显示今日花费（可切换为 Tokens / 消息数）
-- **点击弹出仪表盘**：
-  - 今日花费大字卡片（Tokens、消息数）
-  - 近 7 天花费柱状图（今天的柱子高亮）
-  - 近 7 天 / 本月花费、本月 Tokens 汇总
-  - 今日 Top 4 模型用量明细（模型、客户端、Tokens、费用）
+- **点击弹出仪表盘**，三个时段页签（今天 / 近 7 天 / 本月）：
+  - 渐变花费大卡片（Tokens、消息数胶囊，今日附「较昨日」涨跌）
+  - 今天 → 24 小时分时段柱状图（当前小时高亮）
+  - 近 7 天 → 每日柱状图（今天高亮）
+  - 本月 → 每日花费平滑面积图
+  - 模型 TOP 5 明细（模型、客户端、Tokens、费用、占比底条）
+  - 客户端占比堆叠条 + 图例
+- **中英双语**：设置里一键切换 中文 / English（默认跟随系统）
+- **数字单位**：英制 K/M/B 或 中制 千/万/亿
 - **自定义设置**（齿轮进入）：
   - 菜单栏显示内容：费用 / Tokens / 消息数
   - 刷新间隔：1 / 5 / 15 分钟
@@ -43,7 +47,11 @@ Info.plist                        App 配置（LSUIElement = 无 Dock 图标）
 build-app.sh                      一键打包脚本
 Sources/TokscaleBar/
 ├── main.swift                    入口、AppDelegate、状态栏与定时刷新
-├── Tokscale.swift                tokscale 进程调用、JSON 模型、格式化
+├── Tokscale.swift                tokscale 并发抓取、JSON 模型、数字格式化
 ├── Settings.swift                用户设置（UserDefaults + 登录项）
-└── PopoverView.swift             仪表盘与设置界面
+├── L10n.swift                    中英双语文案与语言/单位枚举
+├── Charts.swift                  柱状图、面积图、客户端占比组件
+└── PopoverView.swift             仪表盘（时段页签）与设置界面
 ```
+
+调试参数：`--preview-window` 窗口预览；`--render-png 路径 [--period today|week|month] [--lang zh|en] [--units western|chinese]` 无界面渲染截图。

@@ -4,51 +4,49 @@ import ServiceManagement
 enum MenuMetric: String, CaseIterable, Identifiable {
     case cost, tokens, messages
     var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .cost: return "费用"
-        case .tokens: return "Tokens"
-        case .messages: return "消息数"
-        }
-    }
 }
 
 enum RefreshInterval: TimeInterval, CaseIterable, Identifiable {
     case minute = 60
     case fiveMinutes = 300
     case fifteenMinutes = 900
-
     var id: TimeInterval { rawValue }
-    var label: String {
-        switch self {
-        case .minute: return "1 分钟"
-        case .fiveMinutes: return "5 分钟"
-        case .fifteenMinutes: return "15 分钟"
-        }
-    }
 }
 
 final class Settings: ObservableObject {
     private let defaults = UserDefaults.standard
 
+    /// Set false to mutate settings in-memory only (used by --render-png previews).
+    var persists = true
+
     @Published var menuMetric: MenuMetric {
-        didSet { defaults.set(menuMetric.rawValue, forKey: "menuMetric") }
+        didSet { guard persists else { return }; defaults.set(menuMetric.rawValue, forKey: "menuMetric") }
     }
     @Published var refreshInterval: RefreshInterval {
-        didSet { defaults.set(refreshInterval.rawValue, forKey: "refreshInterval") }
+        didSet { guard persists else { return }; defaults.set(refreshInterval.rawValue, forKey: "refreshInterval") }
     }
     @Published var tokscalePath: String {
-        didSet { defaults.set(tokscalePath, forKey: "tokscalePath") }
+        didSet { guard persists else { return }; defaults.set(tokscalePath, forKey: "tokscalePath") }
+    }
+    @Published var unitStyle: UnitStyle {
+        didSet { guard persists else { return }; defaults.set(unitStyle.rawValue, forKey: "unitStyle") }
+    }
+    @Published var language: AppLanguage {
+        didSet { guard persists else { return }; defaults.set(language.rawValue, forKey: "language") }
     }
     @Published var launchAtLogin: Bool {
-        didSet { applyLaunchAtLogin() }
+        didSet { guard persists else { return }; applyLaunchAtLogin() }
     }
+
+    var l10n: L10n { L10n(language: language) }
 
     init() {
         menuMetric = MenuMetric(rawValue: defaults.string(forKey: "menuMetric") ?? "") ?? .cost
         let interval = defaults.double(forKey: "refreshInterval")
         refreshInterval = RefreshInterval(rawValue: interval) ?? .fiveMinutes
         tokscalePath = defaults.string(forKey: "tokscalePath") ?? ""
+        unitStyle = UnitStyle(rawValue: defaults.string(forKey: "unitStyle") ?? "") ?? .western
+        language = AppLanguage(rawValue: defaults.string(forKey: "language") ?? "") ?? .systemDefault
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

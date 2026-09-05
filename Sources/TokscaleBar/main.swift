@@ -53,7 +53,7 @@ final class AppModel: ObservableObject {
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.lastError = error.localizedDescription
+                    self.lastError = self.settings.l10n.errorText(error)
                     self.isRefreshing = false
                 }
             }
@@ -65,7 +65,7 @@ final class AppModel: ObservableObject {
         guard let snapshot else { return lastError != nil ? "!" : "…" }
         switch settings.menuMetric {
         case .cost: return Format.cost(snapshot.today.totalCost)
-        case .tokens: return Format.tokens(snapshot.today.totalTokens)
+        case .tokens: return Format.tokens(snapshot.today.totalTokens, settings.unitStyle)
         case .messages: return "\(snapshot.today.totalMessages)"
         }
     }
@@ -78,16 +78,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var cancellable: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Debug: `--render-png <path>` renders the dashboard offscreen and exits.
+        // Debug: `--render-png <path> [--period today|week|month] [--lang zh|en]
+        // [--units western|chinese]` renders the dashboard offscreen and exits.
         if let idx = CommandLine.arguments.firstIndex(of: "--render-png"),
            CommandLine.arguments.indices.contains(idx + 1) {
             let path = CommandLine.arguments[idx + 1]
+            let args = CommandLine.arguments
+            func argValue(_ flag: String) -> String? {
+                guard let i = args.firstIndex(of: flag), args.indices.contains(i + 1) else { return nil }
+                return args[i + 1]
+            }
+            model.settings.persists = false
+            if let lang = argValue("--lang"), let language = AppLanguage(rawValue: lang) {
+                model.settings.language = language
+            }
+            if let units = argValue("--units"), let style = UnitStyle(rawValue: units) {
+                model.settings.unitStyle = style
+            }
+            let period = argValue("--period").flatMap(Period.init(rawValue:)) ?? .today
+
             var observer: Any?
             observer = self.model.$snapshot.compactMap { $0 }.first().sink { [self] _ in
                 _ = observer
                 // Give SwiftUI a runloop turn to lay out before rasterizing.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    Self.renderPNG(model: self.model, to: path)
+                    Self.renderPNG(model: self.model, period: period, to: path)
                     NSApplication.shared.terminate(nil)
                 }
             }
@@ -125,9 +140,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         let snapshotChanged = model.$snapshot.combineLatest(model.$lastError).map { _ in () }
         let metricChanged = model.settings.$menuMetric.map { _ in () }
-        cancellable = snapshotChanged.merge(with: metricChanged).sink { [weak self] in
-            self?.updateTitle()
-        }
+        let unitChanged = model.settings.$unitStyle.map { _ in () }
+        cancellable = snapshotChanged
+            .merge(with: metricChanged, unitChanged)
+            .sink { [weak self] in self?.updateTitle() }
         updateTitle()
     }
 
@@ -145,8 +161,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    static func renderPNG(model: AppModel, to path: String) {
-        let hosting = NSHostingView(rootView: PopoverView(model: model, settings: model.settings))
+    static func renderPNG(model: AppModel, period: Period = .today, to path: String) {
+        let hosting = NSHostingView(rootView: PopoverView(model: model, settings: model.settings, initialPeriod: period))
         let size = hosting.fittingSize
         hosting.frame = NSRect(origin: .zero, size: size)
         hosting.layoutSubtreeIfNeeded()
