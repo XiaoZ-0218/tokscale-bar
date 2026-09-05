@@ -33,7 +33,7 @@ A lightweight macOS menu bar app that turns your local [tokscale](https://github
 
 ### Download
 
-Grab the latest `TokscaleBar-*-macOS.zip` from [Releases](../../releases) (universal binary, Apple Silicon + Intel). The app is ad-hoc signed, so on first launch either right-click → Open, or run `xattr -d com.apple.quarantine TokscaleBar.app`.
+Grab the latest release from [Releases](../../releases) — `TokscaleBar-*-macOS.dmg` (recommended, drag to Applications) or the plain `.zip` (universal binary, Apple Silicon + Intel). The app is ad-hoc signed, so on first launch either right-click → Open, or run `xattr -d com.apple.quarantine TokscaleBar.app`.
 
 ### Build & Run
 
@@ -80,7 +80,7 @@ All data stays local.
 
 ### 下载
 
-到 [Releases](../../releases) 下载最新的 `TokscaleBar-*-macOS.zip`（通用二进制，同时支持 Apple Silicon 和 Intel）。应用是 ad-hoc 签名，首次打开请右键 → 打开，或执行 `xattr -d com.apple.quarantine TokscaleBar.app`。
+到 [Releases](../../releases) 下载最新版本——推荐 `TokscaleBar-*-macOS.dmg`（打开后拖进「应用程序」），也有 `.zip` 可选（通用二进制，同时支持 Apple Silicon 和 Intel）。应用是 ad-hoc 签名，首次打开请右键 → 打开，或执行 `xattr -d com.apple.quarantine TokscaleBar.app`。
 
 ### 构建与运行
 

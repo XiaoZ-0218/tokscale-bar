@@ -17,12 +17,22 @@ jobs:
       # Universal (arm64 + x86_64) build; bundle version comes from the tag.
       - run: VERSION=${GITHUB_REF_NAME#v} ./build-app.sh --universal
 
-      - name: Package
+      - name: Package zip
         run: ditto -c -k --sequesterRsrc --keepParent TokscaleBar.app "TokscaleBar-${GITHUB_REF_NAME}-macOS.zip"
 
-      # Creates the GitHub Release for the tag and uploads the zipped app.
+      - name: Package dmg
+        run: |
+          mkdir dmg-staging
+          cp -R TokscaleBar.app dmg-staging/
+          ln -s /Applications dmg-staging/Applications
+          diskutil image create from --volumeName TokscaleBar --format UDZO \
+            dmg-staging "TokscaleBar-${GITHUB_REF_NAME}-macOS.dmg"
+
+      # Creates the GitHub Release for the tag and uploads the app bundles.
       - uses: softprops/action-gh-release@v2
         with:
           name: TokscaleBar ${{ github.ref_name }}
-          files: TokscaleBar-${{ github.ref_name }}-macOS.zip
+          files: |
+            TokscaleBar-${{ github.ref_name }}-macOS.dmg
+            TokscaleBar-${{ github.ref_name }}-macOS.zip
           generate_release_notes: true
