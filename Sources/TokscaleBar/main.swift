@@ -7,6 +7,8 @@ final class AppModel: ObservableObject {
     @Published var lastError: String?
     @Published var lastUpdated: Date?
     @Published var isRefreshing = false
+    /// Whether the popover shows the settings page. Reset when the popover closes.
+    @Published var showSettings = false
 
     let settings = Settings()
     private let service = TokscaleService()
@@ -158,9 +160,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            model.showSettings = false
             model.refresh()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        // Always land back on the dashboard for the next open.
+        model.showSettings = false
     }
 
     static func renderPNG(model: AppModel, period: Period = .today, to path: String) {

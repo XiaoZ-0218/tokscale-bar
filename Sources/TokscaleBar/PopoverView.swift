@@ -8,7 +8,6 @@ enum Period: String, CaseIterable, Identifiable {
 struct PopoverView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var settings: Settings
-    @State private var showSettings = false
     @State private var period: Period
 
     init(model: AppModel, settings: Settings, initialPeriod: Period = .today) {
@@ -25,8 +24,8 @@ struct PopoverView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if showSettings {
-                SettingsView(settings: settings, showSettings: $showSettings)
+            if model.showSettings {
+                SettingsView(settings: settings, showSettings: $model.showSettings)
             } else {
                 dashboard
             }
@@ -38,23 +37,30 @@ struct PopoverView: View {
     // MARK: - Dashboard
 
     private var dashboard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            header
-            if let error = model.lastError {
-                errorCard(error)
-            } else if let snapshot = model.snapshot {
-                periodPicker
-                heroCard(report, snapshot: snapshot)
-                chartSection(snapshot)
-                modelBreakdown(report)
-                clientShare(report)
-            } else {
-                ProgressView().controlSize(.small)
-                    .frame(maxWidth: .infinity, minHeight: 160)
+        // Content grows with period/model counts; scroll past 620pt instead of
+        // letting the popover overflow the screen.
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                header
+                if let error = model.lastError {
+                    errorCard(error)
+                } else if let snapshot = model.snapshot {
+                    periodPicker
+                    heroCard(report, snapshot: snapshot)
+                    chartSection(snapshot)
+                    modelBreakdown(report)
+                    clientShare(report)
+                } else {
+                    ProgressView().controlSize(.small)
+                        .frame(maxWidth: .infinity, minHeight: 160)
+                }
+                footer
             }
-            footer
+            .padding(14)
+            .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
+        .frame(maxHeight: 620)
+        .scrollIndicators(.automatic)
     }
 
     private var report: Report {
@@ -74,7 +80,7 @@ struct PopoverView: View {
             Text("Tokscale")
                 .font(.system(size: 13, weight: .semibold))
             Spacer()
-            Button(action: { withAnimation(.easeInOut(duration: 0.15)) { showSettings = true } }) {
+            Button(action: { withAnimation(.easeInOut(duration: 0.15)) { model.showSettings = true } }) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 11))
             }
@@ -375,6 +381,15 @@ struct SettingsView: View {
     private var l10n: L10n { settings.l10n }
 
     var body: some View {
+        ScrollView {
+            content
+                .padding(14)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxHeight: 620)
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 6) {
                 Button(action: { withAnimation(.easeInOut(duration: 0.15)) { showSettings = false } }) {
@@ -471,8 +486,6 @@ struct SettingsView: View {
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, alignment: .center)
         }
-        .padding(14)
-        .frame(minHeight: 320)
     }
 
     private func settingRow<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
