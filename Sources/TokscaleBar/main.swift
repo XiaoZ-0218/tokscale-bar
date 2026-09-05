@@ -78,6 +78,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var cancellable: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Debug: `--render-png <path>` renders the dashboard offscreen and exits.
+        if let idx = CommandLine.arguments.firstIndex(of: "--render-png"),
+           CommandLine.arguments.indices.contains(idx + 1) {
+            let path = CommandLine.arguments[idx + 1]
+            var observer: Any?
+            observer = self.model.$snapshot.compactMap { $0 }.first().sink { [self] _ in
+                _ = observer
+                // Give SwiftUI a runloop turn to lay out before rasterizing.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    Self.renderPNG(model: self.model, to: path)
+                    NSApplication.shared.terminate(nil)
+                }
+            }
+        }
+
+        // Debug: `--preview-window` shows the popover content in a regular window.
+        if CommandLine.arguments.contains("--preview-window") {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 320, height: 520),
+                styleMask: [.titled, .closable],
+                backing: .buffered, defer: false
+            )
+            window.title = "TokscaleBar Preview"
+            window.contentViewController = NSHostingController(
+                rootView: PopoverView(model: model, settings: model.settings)
+            )
+            window.setFrameOrigin(NSPoint(x: 260, y: 300))
+            window.makeKeyAndOrderFront(nil)
+        }
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Tokscale")
@@ -114,10 +144,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
     }
+
+    static func renderPNG(model: AppModel, to path: String) {
+        let hosting = NSHostingView(rootView: PopoverView(model: model, settings: model.settings))
+        let size = hosting.fittingSize
+        hosting.frame = NSRect(origin: .zero, size: size)
+        hosting.layoutSubtreeIfNeeded()
+        guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { return }
+        rep.size = size
+        hosting.cacheDisplay(in: hosting.bounds, to: rep)
+        if let png = rep.representation(using: .png, properties: [:]) {
+            try? png.write(to: URL(fileURLWithPath: path))
+        }
+    }
 }
 
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.accessory)
+app.setActivationPolicy(CommandLine.arguments.contains("--preview-window") ? .regular : .accessory)
 app.run()
