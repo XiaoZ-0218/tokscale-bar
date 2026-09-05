@@ -18,6 +18,13 @@ enum UnitStyle: String, CaseIterable, Identifiable {
     var label: String { self == .western ? "K / M" : "千 / 万" }
 }
 
+enum AppCurrency: String, CaseIterable, Identifiable {
+    case usd, cny
+    var id: String { rawValue }
+    var label: String { self == .usd ? "USD $" : "CNY ¥" }
+    var symbol: String { self == .usd ? "$" : "¥" }
+}
+
 /// All user-visible strings, keyed off the selected in-app language.
 struct L10n {
     let language: AppLanguage
@@ -74,6 +81,8 @@ struct L10n {
     var launchAtLogin: String { zh ? "登录时启动" : "Launch at Login" }
     var numberUnits: String { zh ? "数字单位" : "Number Units" }
     var languageLabel: String { zh ? "语言" : "Language" }
+    var currencyLabel: String { zh ? "货币" : "Currency" }
+    var rateLabel: String { zh ? "汇率 USD→CNY" : "Rate USD→CNY" }
     var tokscalePath: String { zh ? "TOKSCALE 路径" : "TOKSCALE PATH" }
     var autoDetect: String { zh ? "留空自动检测" : "Auto-detect" }
     var privacyNote: String {

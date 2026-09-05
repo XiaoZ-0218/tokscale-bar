@@ -64,7 +64,7 @@ final class AppModel: ObservableObject {
     var menuTitle: String {
         guard let snapshot else { return lastError != nil ? "!" : "…" }
         switch settings.menuMetric {
-        case .cost: return Format.cost(snapshot.today.totalCost)
+        case .cost: return Format.cost(snapshot.today.totalCost, currency: settings.currency, rate: settings.usdToCnyRate)
         case .tokens: return Format.tokens(snapshot.today.totalTokens, settings.unitStyle)
         case .messages: return "\(snapshot.today.totalMessages)"
         }
@@ -141,8 +141,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let snapshotChanged = model.$snapshot.combineLatest(model.$lastError).map { _ in () }
         let metricChanged = model.settings.$menuMetric.map { _ in () }
         let unitChanged = model.settings.$unitStyle.map { _ in () }
+        let currencyChanged = model.settings.$currency.map { _ in () }
+        let rateChanged = model.settings.$usdToCnyRate.map { _ in () }
         cancellable = snapshotChanged
-            .merge(with: metricChanged, unitChanged)
+            .merge(with: metricChanged, unitChanged, currencyChanged, rateChanged)
             .sink { [weak self] in self?.updateTitle() }
         updateTitle()
     }

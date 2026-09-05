@@ -97,6 +97,8 @@ struct AreaChart: View {
 /// One horizontal stacked capsule showing cost share per client, with a legend.
 struct ClientShareView: View {
     let shares: [(client: String, cost: Double)]
+    var currency: AppCurrency = .usd
+    var rate: Double = 7.2
 
     var body: some View {
         let total = max(shares.reduce(0) { $0 + $1.cost }, 0.0001)
@@ -120,7 +122,7 @@ struct ClientShareView: View {
                     Text(share.client)
                         .font(.system(size: 10, weight: .medium))
                     Spacer()
-                    Text(Format.cost(share.cost))
+                    Text(Format.cost(share.cost, currency: currency, rate: rate))
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()

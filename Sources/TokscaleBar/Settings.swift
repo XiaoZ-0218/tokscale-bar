@@ -34,6 +34,12 @@ final class Settings: ObservableObject {
     @Published var language: AppLanguage {
         didSet { guard persists else { return }; defaults.set(language.rawValue, forKey: "language") }
     }
+    @Published var currency: AppCurrency {
+        didSet { guard persists else { return }; defaults.set(currency.rawValue, forKey: "currency") }
+    }
+    @Published var usdToCnyRate: Double {
+        didSet { guard persists else { return }; defaults.set(usdToCnyRate, forKey: "usdToCnyRate") }
+    }
     @Published var launchAtLogin: Bool {
         didSet { guard persists else { return }; applyLaunchAtLogin() }
     }
@@ -46,7 +52,12 @@ final class Settings: ObservableObject {
         refreshInterval = RefreshInterval(rawValue: interval) ?? .fiveMinutes
         tokscalePath = defaults.string(forKey: "tokscalePath") ?? ""
         unitStyle = UnitStyle(rawValue: defaults.string(forKey: "unitStyle") ?? "") ?? .western
-        language = AppLanguage(rawValue: defaults.string(forKey: "language") ?? "") ?? .systemDefault
+        let savedLanguage = AppLanguage(rawValue: defaults.string(forKey: "language") ?? "") ?? .systemDefault
+        language = savedLanguage
+        let savedCurrency = AppCurrency(rawValue: defaults.string(forKey: "currency") ?? "")
+        currency = savedCurrency ?? (savedLanguage == .zh ? .cny : .usd)
+        let rate = defaults.double(forKey: "usdToCnyRate")
+        usdToCnyRate = rate > 0 ? rate : 7.2
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

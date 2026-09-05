@@ -202,10 +202,12 @@ final class TokscaleService {
 // MARK: - Formatting
 
 enum Format {
-    static func cost(_ value: Double) -> String {
-        if value >= 100 { return String(format: "$%.0f", value) }
-        if value >= 1 { return String(format: "$%.2f", value) }
-        return String(format: "$%.3f", value)
+    static func cost(_ value: Double, currency: AppCurrency = .usd, rate: Double = 7.2) -> String {
+        let amount = currency == .cny ? value * rate : value
+        let symbol = currency.symbol
+        if amount >= 100 { return String(format: "%@%.0f", symbol, amount) }
+        if amount >= 1 { return String(format: "%@%.2f", symbol, amount) }
+        return String(format: "%@%.3f", symbol, amount)
     }
 
     static func tokens(_ value: Int, _ unit: UnitStyle = .western) -> String {

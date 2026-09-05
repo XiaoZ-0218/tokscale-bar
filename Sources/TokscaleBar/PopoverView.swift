@@ -19,6 +19,10 @@ struct PopoverView: View {
 
     private var l10n: L10n { settings.l10n }
 
+    private func cost(_ value: Double) -> String {
+        Format.cost(value, currency: settings.currency, rate: settings.usdToCnyRate)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if showSettings {
@@ -101,7 +105,7 @@ struct PopoverView: View {
                     .foregroundStyle(.white.opacity(0.55))
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(Format.cost(report.totalCost))
+                Text(cost(report.totalCost))
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
@@ -245,7 +249,7 @@ struct PopoverView: View {
                             .font(.system(size: 10))
                             .foregroundStyle(.tertiary)
                             .monospacedDigit()
-                        Text(Format.cost(entry.cost))
+                        Text(cost(entry.cost))
                             .font(.system(size: 11, weight: .semibold))
                             .monospacedDigit()
                             .frame(minWidth: 54, alignment: .trailing)
@@ -280,7 +284,7 @@ struct PopoverView: View {
             if !shares.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     sectionTitle(l10n.byClient)
-                    ClientShareView(shares: shares)
+                    ClientShareView(shares: shares, currency: settings.currency, rate: settings.usdToCnyRate)
                 }
             }
         }
@@ -401,6 +405,25 @@ struct SettingsView: View {
                     .labelsHidden()
                     .pickerStyle(.segmented)
                     .frame(width: 150)
+                }
+                rowDivider
+                settingRow(l10n.currencyLabel) {
+                    Picker("", selection: $settings.currency) {
+                        ForEach(AppCurrency.allCases) { Text($0.label).tag($0) }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 150)
+                }
+                if settings.currency == .cny {
+                    rowDivider
+                    settingRow(l10n.rateLabel) {
+                        TextField("7.2", value: $settings.usdToCnyRate, format: .number)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 11))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 70)
+                    }
                 }
                 rowDivider
                 settingRow(l10n.menuBarShows) {
