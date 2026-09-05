@@ -25,8 +25,10 @@ jobs:
           mkdir dmg-staging
           cp -R TokscaleBar.app dmg-staging/
           ln -s /Applications dmg-staging/Applications
-          diskutil image create from --volumeName TokscaleBar --format UDZO \
-            dmg-staging "TokscaleBar-${GITHUB_REF_NAME}-macOS.dmg"
+          # hdiutil is deprecated on the newest macOS but still works everywhere;
+          # diskutil image create lacks --volumeName before macOS 26.
+          hdiutil create -volname TokscaleBar -srcfolder dmg-staging -ov -format UDZO \
+            "TokscaleBar-${GITHUB_REF_NAME}-macOS.dmg"
 
       # Creates the GitHub Release for the tag and uploads the app bundles.
       - uses: softprops/action-gh-release@v2
