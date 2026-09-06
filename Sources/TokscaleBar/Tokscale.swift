@@ -158,11 +158,12 @@ final class TokscaleService {
                 }
                 process.waitUntilExit()
                 // A killed child can leave the pipes held open by a
-                // grandchild; bound the drain, then close the read ends so
-                // stuck reader threads unblock instead of leaking.
+                // grandchild, so the drain wait must be bounded too. Don't
+                // close the read ends here: closing under a blocked
+                // readDataToEndOfFile can raise NSFileHandleOperationException
+                // on the reader thread and abort the process. Worst case is a
+                // couple of sleeping reader threads; the UI still recovers.
                 _ = reads.wait(timeout: .now() + 1)
-                try? stdout.fileHandleForReading.close()
-                try? stderr.fileHandleForReading.close()
                 throw TokscaleError.timedOut
             }
             // else: exited on its own right at the deadline — fall through
@@ -172,8 +173,6 @@ final class TokscaleService {
         // The process is dead, so its output is already in the pipe buffers;
         // if a grandchild holds them open, fail instead of blocking forever.
         if reads.wait(timeout: .now() + 2) == .timedOut {
-            try? stdout.fileHandleForReading.close()
-            try? stderr.fileHandleForReading.close()
             throw TokscaleError.failed("tokscale exited but its output streams never closed")
         }
         guard process.terminationStatus == 0 else {
