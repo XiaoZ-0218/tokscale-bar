@@ -98,7 +98,7 @@ struct AreaChart: View {
 struct ClientShareView: View {
     let shares: [(client: String, cost: Double)]
     var currency: AppCurrency = .usd
-    var rate: Double = 7.2
+    var rate: Double = Defaults.usdToCnyRate
 
     var body: some View {
         let total = max(shares.reduce(0) { $0 + $1.cost }, 0.0001)
