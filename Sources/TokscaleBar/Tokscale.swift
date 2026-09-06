@@ -10,10 +10,12 @@ struct Report: Decodable {
         let output: Int
         let cacheRead: Int
         let cacheWrite: Int
+        /// Reasoning tokens; optional so older tokscale builds still decode.
+        let reasoning: Int?
         let cost: Double
         let messageCount: Int
 
-        var tokens: Int { input + output + cacheRead + cacheWrite }
+        var tokens: Int { input + output + cacheRead + cacheWrite + (reasoning ?? 0) }
     }
 
     let entries: [Entry]
@@ -24,7 +26,12 @@ struct Report: Decodable {
     let totalMessages: Int
     let totalCost: Double
 
-    var totalTokens: Int { totalInput + totalOutput + totalCacheRead + totalCacheWrite }
+    /// The report's top-level totals exclude reasoning, so sum it from
+    /// entries to stay consistent with `graph`'s totals.tokens.
+    var totalTokens: Int {
+        totalInput + totalOutput + totalCacheRead + totalCacheWrite
+            + entries.reduce(0) { $0 + ($1.reasoning ?? 0) }
+    }
 }
 
 struct DayUsage: Decodable {
