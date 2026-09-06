@@ -45,18 +45,20 @@ final class AppModel: ObservableObject {
         isRefreshing = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
+            // Whatever happens below, the refresh button and timer must recover.
+            defer {
+                DispatchQueue.main.async { self.isRefreshing = false }
+            }
             do {
                 let snapshot = try self.service.fetchSnapshot()
                 DispatchQueue.main.async {
                     self.snapshot = snapshot
                     self.lastError = nil
                     self.lastUpdated = Date()
-                    self.isRefreshing = false
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.lastError = self.settings.l10n.errorText(error)
-                    self.isRefreshing = false
                 }
             }
         }

@@ -67,6 +67,7 @@ struct Snapshot {
 
 enum TokscaleError: Error {
     case binaryNotFound
+    case timedOut
     case failed(String)
 }
 
@@ -84,6 +85,9 @@ final class TokscaleService {
         return nil
     }
 
+    /// Max wall-clock time for one tokscale invocation before SIGTERM/SIGKILL.
+    private let timeout: TimeInterval = 20
+
     private func run(_ arguments: [String]) throws -> Data {
         guard let binary = resolveBinary() else { throw TokscaleError.binaryNotFound }
         let process = Process()
@@ -94,13 +98,41 @@ final class TokscaleService {
         process.standardOutput = stdout
         process.standardError = stderr
         try process.run()
-        let data = stdout.fileHandleForReading.readDataToEndOfFile()
+
+        // Drain both pipes concurrently: a child that fills stderr's ~64KB
+        // buffer would otherwise block forever while we wait on stdout.
+        var outData = Data()
+        var errData = Data()
+        let reads = DispatchGroup()
+        reads.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            outData = stdout.fileHandleForReading.readDataToEndOfFile()
+            reads.leave()
+        }
+        reads.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            errData = stderr.fileHandleForReading.readDataToEndOfFile()
+            reads.leave()
+        }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if process.isRunning {
+            process.terminate() // SIGTERM
+            Thread.sleep(forTimeInterval: 0.5)
+            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+            reads.wait()
+            throw TokscaleError.timedOut
+        }
         process.waitUntilExit()
+        reads.wait()
         guard process.terminationStatus == 0 else {
-            let msg = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            let msg = String(data: errData, encoding: .utf8) ?? ""
             throw TokscaleError.failed(msg.trimmingCharacters(in: .whitespacesAndNewlines))
         }
-        return data
+        return outData
     }
 
     private enum Job: Int, CaseIterable {
