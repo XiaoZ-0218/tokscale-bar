@@ -5,6 +5,7 @@ let package = Package(
     name: "TokscaleBar",
     platforms: [.macOS(.v13)],
     targets: [
-        .executableTarget(name: "TokscaleBar", path: "Sources/TokscaleBar")
+        .executableTarget(name: "TokscaleBar", path: "Sources/TokscaleBar"),
+        .testTarget(name: "TokscaleBarTests", dependencies: ["TokscaleBar"])
     ]
 )
