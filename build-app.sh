@@ -21,7 +21,9 @@ cp Info.plist "$APP/Contents/"
 
 if [ -n "$VERSION" ]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP/Contents/Info.plist"
+    # CFBundleVersion must increase monotonically (dotted-int compare);
+    # a timestamp keeps releases ahead of local builds' "1".
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(date +%Y%m%d%H%M)" "$APP/Contents/Info.plist"
 fi
 
 # Ad-hoc sign so Gatekeeper and login-item registration behave. A failed

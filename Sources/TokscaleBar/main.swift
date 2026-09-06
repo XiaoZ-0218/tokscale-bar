@@ -164,7 +164,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             // Give SwiftUI a runloop turn to lay out before rasterizing.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 guard let self else { return }
-                Self.renderPNG(model: self.model, period: period, to: path)
+                guard Self.renderPNG(model: self.model, period: period, to: path) else {
+                    FileHandle.standardError.write(Data("render-png: failed to write \(path)\n".utf8))
+                    exit(1)
+                }
                 NSApplication.shared.terminate(nil)
             }
         }.store(in: &renderObservers)
@@ -202,17 +205,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         model.showSettings = false
     }
 
-    static func renderPNG(model: AppModel, period: Period = .today, to path: String) {
+    /// Renders the popover offscreen. Returns false when the bitmap or the
+    /// file write fails, so headless callers don't exit 0 with no image.
+    @discardableResult
+    static func renderPNG(model: AppModel, period: Period = .today, to path: String) -> Bool {
         let hosting = NSHostingView(rootView: PopoverView(model: model, settings: model.settings, initialPeriod: period))
         let size = hosting.fittingSize
         hosting.frame = NSRect(origin: .zero, size: size)
         hosting.layoutSubtreeIfNeeded()
-        guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { return }
+        guard let rep = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { return false }
         rep.size = size
         hosting.cacheDisplay(in: hosting.bounds, to: rep)
-        if let png = rep.representation(using: .png, properties: [:]) {
-            try? png.write(to: URL(fileURLWithPath: path))
-        }
+        guard let png = rep.representation(using: .png, properties: [:]) else { return false }
+        return (try? png.write(to: URL(fileURLWithPath: path))) != nil
     }
 }
 
