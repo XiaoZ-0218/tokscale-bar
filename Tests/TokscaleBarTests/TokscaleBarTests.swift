@@ -96,10 +96,18 @@ final class PaddingTests: XCTestCase {
 
     func testPadMonthStartsOnTheFirst() {
         let days = TokscaleService.padMonth([])
-        let calendar = Calendar.current
+        // Same calendar the implementation uses (Gregorian, local tz).
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .autoupdatingCurrent
         XCTAssertEqual(days.count, calendar.component(.day, from: Date()))
         let firstDay = Self.dayFormatter.date(from: days[0].date).map { calendar.component(.day, from: $0) }
         XCTAssertEqual(firstDay, 1)
+    }
+
+    func testPadMonthToleratesDuplicateDates() {
+        let today = Self.dayFormatter.string(from: Date())
+        let days = TokscaleService.padMonth([day(today, cost: 1), day(today, cost: 2)])
+        XCTAssertEqual(days.last?.totals.cost, 2) // last duplicate wins
     }
 }
 

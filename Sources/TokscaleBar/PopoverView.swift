@@ -370,7 +370,7 @@ struct PopoverView: View {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.calendar = Calendar(identifier: .gregorian)
-        f.timeZone = .current
+        f.timeZone = .autoupdatingCurrent
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -381,7 +381,9 @@ struct PopoverView: View {
 
     private func weekdayLetter(_ date: String) -> String {
         guard let d = Self.dayFormatter.date(from: date) else { return "" }
-        return l10n.weekdayLetters[Calendar.current.component(.weekday, from: d) - 1]
+        // Use the formatter's Gregorian calendar, not Calendar.current, so a
+        // non-Gregorian system calendar can't skew the weekday.
+        return l10n.weekdayLetters[Self.dayFormatter.calendar.component(.weekday, from: d) - 1]
     }
 }
 

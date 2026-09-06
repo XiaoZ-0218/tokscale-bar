@@ -209,12 +209,20 @@ final class TokscaleService {
 
     /// POSIX locale + Gregorian calendar so a user on a non-Gregorian
     /// system calendar still parses tokscale's ISO dates correctly. Padding
-    /// keys follow the local time zone ("today" means the Mac's today).
+    /// keys follow the local time zone ("today" means the Mac's today);
+    /// autoupdating so a long-lived menu bar app survives timezone changes.
+    private static let calendar: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.locale = Locale(identifier: "en_US_POSIX")
+        c.timeZone = .autoupdatingCurrent
+        return c
+    }()
+
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.calendar = Calendar(identifier: .gregorian)
-        f.timeZone = .current
+        f.calendar = calendar
+        f.timeZone = .autoupdatingCurrent
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -236,7 +244,6 @@ final class TokscaleService {
     static func padWeek(_ days: [DayUsage]) -> [DayUsage] {
         // graph can repeat a date; uniqueKeysWithValues would trap.
         let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
-        let calendar = Calendar.current
         return (0..<7).reversed().map { offset in
             let date = calendar.date(byAdding: .day, value: -offset, to: Date())!
             let key = dayFormatter.string(from: date)
@@ -247,7 +254,6 @@ final class TokscaleService {
     /// Days of the current month from the 1st to today, zero-filled.
     static func padMonth(_ days: [DayUsage]) -> [DayUsage] {
         let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
-        let calendar = Calendar.current
         let today = Date()
         let day = calendar.component(.day, from: today)
         return (0..<day).reversed().map { offset in
