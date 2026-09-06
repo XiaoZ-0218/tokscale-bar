@@ -12,7 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Gate: the package must compile and bundle into a valid .app.
+      # Gate: unit tests pass and the package bundles into a valid .app.
+      - run: swift test
+
       - run: ./build-app.sh
 
       - name: Verify bundle

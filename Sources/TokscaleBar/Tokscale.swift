@@ -53,7 +53,7 @@ private struct GraphPayload: Decodable {
     let contributions: [DayUsage]
 }
 
-private struct HourlyPayload: Decodable {
+struct HourlyPayload: Decodable {
     struct Entry: Decodable {
         let hour: String // "YYYY-MM-DD HH:00"
         let cost: Double
@@ -215,7 +215,7 @@ final class TokscaleService {
     }()
 
     /// All 24 hours of today, zero-filled.
-    private static func padHours(_ payload: HourlyPayload) -> [HourUsage] {
+    static func padHours(_ payload: HourlyPayload) -> [HourUsage] {
         var byHour: [Int: Double] = [:]
         for entry in payload.entries {
             // "2026-09-06 09:00" — take the HH of the time component.
@@ -228,7 +228,7 @@ final class TokscaleService {
     }
 
     /// 7 days ending today, zero-filled.
-    private static func padWeek(_ days: [DayUsage]) -> [DayUsage] {
+    static func padWeek(_ days: [DayUsage]) -> [DayUsage] {
         // graph can repeat a date; uniqueKeysWithValues would trap.
         let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
         let calendar = Calendar.current
@@ -240,7 +240,7 @@ final class TokscaleService {
     }
 
     /// Days of the current month from the 1st to today, zero-filled.
-    private static func padMonth(_ days: [DayUsage]) -> [DayUsage] {
+    static func padMonth(_ days: [DayUsage]) -> [DayUsage] {
         let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
         let calendar = Calendar.current
         let today = Date()
