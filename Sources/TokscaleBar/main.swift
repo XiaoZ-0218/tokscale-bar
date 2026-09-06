@@ -44,6 +44,7 @@ final class AppModel: ObservableObject {
     func refresh() {
         guard !isRefreshing else { return }
         isRefreshing = true
+        lastError = nil // a new attempt starts; don't show the stale failure
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
             // Whatever happens below, the refresh button and timer must recover.
