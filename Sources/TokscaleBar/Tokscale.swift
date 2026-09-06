@@ -154,9 +154,13 @@ final class TokscaleService {
                 if exited.wait(timeout: .now() + 1) == .timedOut,
                    process.isRunning, process.processIdentifier > 0 {
                     kill(process.processIdentifier, SIGKILL)
-                    _ = exited.wait(timeout: .now() + 1)
+                    // A child in uninterruptible sleep survives even SIGKILL
+                    // briefly; keep this wait bounded too — the path throws
+                    // timedOut regardless of what terminationStatus says.
+                    _ = exited.wait(timeout: .now() + 2)
+                } else {
+                    process.waitUntilExit() // settles terminationStatus
                 }
-                process.waitUntilExit()
                 // A killed child can leave the pipes held open by a
                 // grandchild, so the drain wait must be bounded too. Don't
                 // close the read ends here: closing under a blocked
@@ -269,24 +273,23 @@ final class TokscaleService {
         return (0..<24).map { HourUsage(hour: $0, cost: byHour[$0] ?? 0) }
     }
 
-    /// 7 days ending today, zero-filled.
-    static func padWeek(_ days: [DayUsage]) -> [DayUsage] {
+    /// 7 days ending `now`, zero-filled. `now` is injectable for tests.
+    static func padWeek(_ days: [DayUsage], now: Date = Date()) -> [DayUsage] {
         // graph can repeat a date; uniqueKeysWithValues would trap.
         let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
         return (0..<7).reversed().map { offset in
-            let date = calendar.date(byAdding: .day, value: -offset, to: Date())!
+            let date = calendar.date(byAdding: .day, value: -offset, to: now)!
             let key = dayFormatter.string(from: date)
             return byDate[key] ?? DayUsage(date: key, totals: .init(tokens: 0, cost: 0, messages: 0))
         }
     }
 
-    /// Days of the current month from the 1st to today, zero-filled.
-    static func padMonth(_ days: [DayUsage]) -> [DayUsage] {
+    /// Days of the current month from the 1st to `now`, zero-filled.
+    static func padMonth(_ days: [DayUsage], now: Date = Date()) -> [DayUsage] {
         let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
-        let today = Date()
-        let day = calendar.component(.day, from: today)
+        let day = calendar.component(.day, from: now)
         return (0..<day).reversed().map { offset in
-            let date = calendar.date(byAdding: .day, value: -offset, to: today)!
+            let date = calendar.date(byAdding: .day, value: -offset, to: now)!
             let key = dayFormatter.string(from: date)
             return byDate[key] ?? DayUsage(date: key, totals: .init(tokens: 0, cost: 0, messages: 0))
         }
