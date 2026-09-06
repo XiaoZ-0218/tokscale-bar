@@ -41,8 +41,14 @@ final class Settings: ObservableObject {
         didSet { guard persists else { return }; defaults.set(usdToCnyRate, forKey: "usdToCnyRate") }
     }
     @Published var launchAtLogin: Bool {
-        didSet { guard persists else { return }; applyLaunchAtLogin() }
+        didSet {
+            guard persists, !applyingLaunchAtLogin else { return }
+            applyLaunchAtLogin()
+        }
     }
+    /// Reentrancy guard: reverting the toggle inside `applyLaunchAtLogin`'s
+    /// catch fires `didSet` again, which must not re-apply (stack overflow).
+    private var applyingLaunchAtLogin = false
 
     var l10n: L10n { L10n(language: language) }
 
@@ -62,6 +68,8 @@ final class Settings: ObservableObject {
     }
 
     private func applyLaunchAtLogin() {
+        applyingLaunchAtLogin = true
+        defer { applyingLaunchAtLogin = false }
         do {
             if launchAtLogin {
                 try SMAppService.mainApp.register()
@@ -70,7 +78,9 @@ final class Settings: ObservableObject {
             }
         } catch {
             // Unsigned/dev bundles may fail; revert toggle to reflect reality.
-            launchAtLogin = SMAppService.mainApp.status == .enabled
+            // Skip the write when already in sync so didSet doesn't fire again.
+            let enabled = SMAppService.mainApp.status == .enabled
+            if launchAtLogin != enabled { launchAtLogin = enabled }
         }
     }
 }
