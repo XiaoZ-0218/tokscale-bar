@@ -83,17 +83,26 @@ final class TokscaleService {
     /// Settings-provided override; empty means auto-detect.
     var binaryPath: String = ""
 
+    /// isExecutableFile alone accepts directories (the search bit), so a
+    /// usable binary must be a regular executable file.
+    private func isExecutableBinary(_ path: String) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+            && !isDirectory.boolValue
+            && FileManager.default.isExecutableFile(atPath: path)
+    }
+
     /// A custom path must be executable — silently falling back to another
     /// binary would make the settings field lie. Empty means auto-detect.
     private func resolveBinary() throws -> String {
         if !binaryPath.isEmpty {
-            guard FileManager.default.isExecutableFile(atPath: binaryPath) else {
+            guard isExecutableBinary(binaryPath) else {
                 throw TokscaleError.invalidBinaryPath(binaryPath)
             }
             return binaryPath
         }
         for path in ["/opt/homebrew/bin/tokscale", "/usr/local/bin/tokscale"] {
-            if FileManager.default.isExecutableFile(atPath: path) { return path }
+            if isExecutableBinary(path) { return path }
         }
         throw TokscaleError.binaryNotFound
     }
@@ -117,23 +126,34 @@ final class TokscaleService {
 
         // Drain both pipes concurrently: a child that fills stderr's ~64KB
         // buffer would otherwise block forever while we wait on stdout.
+        // Writes go through a lock so there's no data race on the buffers.
+        let bufferLock = NSLock()
         var outData = Data()
         var errData = Data()
         let reads = DispatchGroup()
         reads.enter()
         DispatchQueue.global(qos: .userInitiated).async {
-            outData = stdout.fileHandleForReading.readDataToEndOfFile()
+            let data = stdout.fileHandleForReading.readDataToEndOfFile()
+            bufferLock.lock()
+            outData = data
+            bufferLock.unlock()
             reads.leave()
         }
         reads.enter()
         DispatchQueue.global(qos: .userInitiated).async {
-            errData = stderr.fileHandleForReading.readDataToEndOfFile()
+            let data = stderr.fileHandleForReading.readDataToEndOfFile()
+            bufferLock.lock()
+            errData = data
+            bufferLock.unlock()
             reads.leave()
         }
 
         if exited.wait(timeout: .now() + timeout) == .timedOut {
-            process.terminate() // SIGTERM
-            if exited.wait(timeout: .now() + 1) == .timedOut {
+            if process.isRunning, process.processIdentifier > 0 {
+                process.terminate() // SIGTERM
+            }
+            if exited.wait(timeout: .now() + 1) == .timedOut,
+               process.isRunning, process.processIdentifier > 0 {
                 kill(process.processIdentifier, SIGKILL)
                 _ = exited.wait(timeout: .now() + 1)
             }
@@ -145,7 +165,11 @@ final class TokscaleService {
             throw TokscaleError.timedOut
         }
         process.waitUntilExit() // no-op once terminated; settles terminationStatus
-        reads.wait()
+        // The process is dead, so its output is already in the pipe buffers;
+        // if a grandchild holds them open, fail instead of blocking forever.
+        if reads.wait(timeout: .now() + 2) == .timedOut {
+            throw TokscaleError.failed("tokscale exited but its output streams never closed")
+        }
         guard process.terminationStatus == 0 else {
             let msg = String(data: errData, encoding: .utf8) ?? ""
             throw TokscaleError.failed(msg.trimmingCharacters(in: .whitespacesAndNewlines))
