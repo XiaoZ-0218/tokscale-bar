@@ -280,12 +280,13 @@ enum Format {
         }
     }
 
+    /// 千 is dropped: "1.0千" reads unnaturally in Chinese, so anything
+    /// below 1万 stays a plain number.
     static func compactChinese(_ value: Double) -> String {
         switch abs(value) {
         case 100_000_000...: return String(format: "%.1f亿", value / 1e8)
         case 1_000_000...: return String(format: "%.0f万", value / 1e4)
         case 10_000...: return String(format: "%.1f万", value / 1e4)
-        case 1_000...: return String(format: "%.1f千", value / 1e3)
         default: return String(format: "%.0f", value)
         }
     }

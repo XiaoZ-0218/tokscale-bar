@@ -13,9 +13,9 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 }
 
 enum UnitStyle: String, CaseIterable, Identifiable {
-    case western, chinese // K/M/B vs 千/万/亿
+    case western, chinese // K/M/B vs 万/亿
     var id: String { rawValue }
-    var label: String { self == .western ? "K / M" : "千 / 万" }
+    var label: String { self == .western ? "K / M" : "万 / 亿" }
 }
 
 enum AppCurrency: String, CaseIterable, Identifiable {
