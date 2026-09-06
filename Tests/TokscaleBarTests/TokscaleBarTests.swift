@@ -121,3 +121,16 @@ final class ClampRateTests: XCTestCase {
         XCTAssertEqual(Settings.clampRate(1000), 100)
     }
 }
+
+final class L10nErrorTests: XCTestCase {
+    func testTimeoutCopy() {
+        XCTAssertEqual(L10n(language: .zh).errorText(TokscaleError.timedOut), "tokscale 超时，请稍后重试")
+        XCTAssertEqual(L10n(language: .en).errorText(TokscaleError.timedOut), "tokscale timed out")
+    }
+
+    func testInvalidPathCopyIncludesPath() {
+        let path = "/tmp/not-a-binary"
+        XCTAssertTrue(L10n(language: .zh).errorText(TokscaleError.invalidBinaryPath(path)).contains(path))
+        XCTAssertTrue(L10n(language: .en).errorText(TokscaleError.invalidBinaryPath(path)).contains(path))
+    }
+}
