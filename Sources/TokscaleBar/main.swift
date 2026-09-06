@@ -87,8 +87,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Debug: `--render-png` renders the dashboard offscreen and exits, so
         // it must never touch the status bar.
-        if let idx = CommandLine.arguments.firstIndex(of: "--render-png"),
-           CommandLine.arguments.indices.contains(idx + 1) {
+        if let idx = CommandLine.arguments.firstIndex(of: "--render-png") {
+            guard CommandLine.arguments.indices.contains(idx + 1) else {
+                FileHandle.standardError.write(Data("usage: --render-png <path> [--period today|week|month] [--lang zh|en] [--units western|chinese] [--currency usd|cny]\n".utf8))
+                exit(2)
+            }
             setupRenderPNG(path: CommandLine.arguments[idx + 1])
             return
         }
