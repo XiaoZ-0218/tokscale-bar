@@ -67,6 +67,7 @@ struct Snapshot {
 
 enum TokscaleError: Error {
     case binaryNotFound
+    case invalidBinaryPath(String)
     case timedOut
     case failed(String)
 }
@@ -75,21 +76,26 @@ final class TokscaleService {
     /// Settings-provided override; empty means auto-detect.
     var binaryPath: String = ""
 
-    private func resolveBinary() -> String? {
-        if !binaryPath.isEmpty, FileManager.default.isExecutableFile(atPath: binaryPath) {
+    /// A custom path must be executable — silently falling back to another
+    /// binary would make the settings field lie. Empty means auto-detect.
+    private func resolveBinary() throws -> String {
+        if !binaryPath.isEmpty {
+            guard FileManager.default.isExecutableFile(atPath: binaryPath) else {
+                throw TokscaleError.invalidBinaryPath(binaryPath)
+            }
             return binaryPath
         }
         for path in ["/opt/homebrew/bin/tokscale", "/usr/local/bin/tokscale"] {
             if FileManager.default.isExecutableFile(atPath: path) { return path }
         }
-        return nil
+        throw TokscaleError.binaryNotFound
     }
 
     /// Max wall-clock time for one tokscale invocation before SIGTERM/SIGKILL.
     private let timeout: TimeInterval = 20
 
     private func run(_ arguments: [String]) throws -> Data {
-        guard let binary = resolveBinary() else { throw TokscaleError.binaryNotFound }
+        let binary = try resolveBinary()
         let process = Process()
         let stdout = Pipe()
         let stderr = Pipe()
