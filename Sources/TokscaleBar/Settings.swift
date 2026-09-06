@@ -48,9 +48,9 @@ final class Settings: ObservableObject {
         didSet {
             let clamped = Self.clampRate(usdToCnyRate)
             if usdToCnyRate != clamped {
-                // Re-entering didSet here is safe: the nested pass sees an
-                // already-clamped value and takes the persist path instead.
-                usdToCnyRate = clamped
+                // Hop out of the TextField commit before publishing the
+                // correction back, so it can't land mid view-update.
+                DispatchQueue.main.async { self.usdToCnyRate = clamped }
                 return
             }
             guard persists else { return }
