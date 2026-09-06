@@ -25,7 +25,7 @@ if [ -n "$VERSION" ]; then
 fi
 
 # Ad-hoc sign so Gatekeeper and login-item registration behave. A failed
-# signing must fail the build, not ship an unsigned bundle.
-codesign --force --deep --sign - "$APP" 2>/dev/null
+# signing must fail the build, with its message visible.
+codesign --force --deep --sign - "$APP"
 
 echo "Built $APP"
