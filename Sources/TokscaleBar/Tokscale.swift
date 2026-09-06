@@ -202,8 +202,14 @@ final class TokscaleService {
 
     // MARK: - Zero-filling helpers
 
+    /// POSIX locale + Gregorian calendar so a user on a non-Gregorian
+    /// system calendar still parses tokscale's ISO dates correctly. Padding
+    /// keys follow the local time zone ("today" means the Mac's today).
     private static let dayFormatter: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = .current
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -212,7 +218,9 @@ final class TokscaleService {
     private static func padHours(_ payload: HourlyPayload) -> [HourUsage] {
         var byHour: [Int: Double] = [:]
         for entry in payload.entries {
-            if let hour = Int(entry.hour.suffix(5).prefix(2)) {
+            // "2026-09-06 09:00" — take the HH of the time component.
+            if let time = entry.hour.split(separator: " ").last,
+               let hour = Int(time.prefix(2)) {
                 byHour[hour, default: 0] += entry.cost
             }
         }
@@ -221,7 +229,8 @@ final class TokscaleService {
 
     /// 7 days ending today, zero-filled.
     private static func padWeek(_ days: [DayUsage]) -> [DayUsage] {
-        let byDate = Dictionary(uniqueKeysWithValues: days.map { ($0.date, $0) })
+        // graph can repeat a date; uniqueKeysWithValues would trap.
+        let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
         let calendar = Calendar.current
         return (0..<7).reversed().map { offset in
             let date = calendar.date(byAdding: .day, value: -offset, to: Date())!
@@ -232,7 +241,7 @@ final class TokscaleService {
 
     /// Days of the current month from the 1st to today, zero-filled.
     private static func padMonth(_ days: [DayUsage]) -> [DayUsage] {
-        let byDate = Dictionary(uniqueKeysWithValues: days.map { ($0.date, $0) })
+        let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
         let calendar = Calendar.current
         let today = Date()
         let day = calendar.component(.day, from: today)
