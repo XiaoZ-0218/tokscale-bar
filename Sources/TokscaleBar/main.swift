@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Holds the fetched snapshot and drives refreshes on a timer.
@@ -80,36 +81,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var popover: NSPopover!
     private let model = AppModel()
     private var cancellable: Any?
+    private var renderObservers: [AnyCancellable] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Debug: `--render-png <path> [--period today|week|month] [--lang zh|en]
-        // [--units western|chinese]` renders the dashboard offscreen and exits.
+        // Debug: `--render-png` renders the dashboard offscreen and exits, so
+        // it must never touch the status bar.
         if let idx = CommandLine.arguments.firstIndex(of: "--render-png"),
            CommandLine.arguments.indices.contains(idx + 1) {
-            let path = CommandLine.arguments[idx + 1]
-            let args = CommandLine.arguments
-            func argValue(_ flag: String) -> String? {
-                guard let i = args.firstIndex(of: flag), args.indices.contains(i + 1) else { return nil }
-                return args[i + 1]
-            }
-            model.settings.persists = false
-            if let lang = argValue("--lang"), let language = AppLanguage(rawValue: lang) {
-                model.settings.language = language
-            }
-            if let units = argValue("--units"), let style = UnitStyle(rawValue: units) {
-                model.settings.unitStyle = style
-            }
-            let period = argValue("--period").flatMap(Period.init(rawValue:)) ?? .today
-
-            var observer: Any?
-            observer = self.model.$snapshot.compactMap { $0 }.first().sink { [self] _ in
-                _ = observer
-                // Give SwiftUI a runloop turn to lay out before rasterizing.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    Self.renderPNG(model: self.model, period: period, to: path)
-                    NSApplication.shared.terminate(nil)
-                }
-            }
+            setupRenderPNG(path: CommandLine.arguments[idx + 1])
+            return
         }
 
         // Debug: `--preview-window` shows the popover content in a regular window.
@@ -151,6 +131,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             .merge(with: metricChanged, unitChanged, currencyChanged, rateChanged)
             .sink { [weak self] in self?.updateTitle() }
         updateTitle()
+    }
+
+    /// `--render-png <path> [--period today|week|month] [--lang zh|en]
+    /// [--units western|chinese]`: renders once data arrives, then exits 0.
+    /// Exits non-zero on fetch error or after a 30s deadline (the 20s
+    /// subprocess timeout plus slack) so callers can never hang.
+    private func setupRenderPNG(path: String) {
+        let args = CommandLine.arguments
+        func argValue(_ flag: String) -> String? {
+            guard let i = args.firstIndex(of: flag), args.indices.contains(i + 1) else { return nil }
+            return args[i + 1]
+        }
+        model.settings.persists = false
+        if let lang = argValue("--lang"), let language = AppLanguage(rawValue: lang) {
+            model.settings.language = language
+        }
+        if let units = argValue("--units"), let style = UnitStyle(rawValue: units) {
+            model.settings.unitStyle = style
+        }
+        let period = argValue("--period").flatMap(Period.init(rawValue:)) ?? .today
+
+        model.$snapshot.compactMap { $0 }.first().sink { [weak self] _ in
+            // Give SwiftUI a runloop turn to lay out before rasterizing.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                guard let self else { return }
+                Self.renderPNG(model: self.model, period: period, to: path)
+                NSApplication.shared.terminate(nil)
+            }
+        }.store(in: &renderObservers)
+
+        model.$lastError.compactMap { $0 }.first().sink { [weak self] error in
+            guard let self, self.model.snapshot == nil else { return }
+            FileHandle.standardError.write(Data((error + "\n").utf8))
+            exit(1)
+        }.store(in: &renderObservers)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+            guard self?.model.snapshot == nil else { return }
+            FileHandle.standardError.write(Data("render-png: timed out waiting for tokscale data\n".utf8))
+            exit(1)
+        }
     }
 
     private func updateTitle() {
