@@ -13,6 +13,13 @@ enum RefreshInterval: TimeInterval, CaseIterable, Identifiable {
     var id: TimeInterval { rawValue }
 }
 
+/// Shared default values so Settings, Format, and the views stop
+/// duplicating literals.
+enum Defaults {
+    static let usdToCnyRate: Double = 7.2
+    static let usdToCnyRateRange: ClosedRange<Double> = 0.1...100
+}
+
 final class Settings: ObservableObject {
     private let defaults = UserDefaults.standard
 
@@ -38,7 +45,25 @@ final class Settings: ObservableObject {
         didSet { guard persists else { return }; defaults.set(currency.rawValue, forKey: "currency") }
     }
     @Published var usdToCnyRate: Double {
-        didSet { guard persists else { return }; defaults.set(usdToCnyRate, forKey: "usdToCnyRate") }
+        didSet {
+            let clamped = Self.clampRate(usdToCnyRate)
+            if usdToCnyRate != clamped {
+                // Re-entering didSet here is safe: the nested pass sees an
+                // already-clamped value and takes the persist path instead.
+                usdToCnyRate = clamped
+                return
+            }
+            guard persists else { return }
+            defaults.set(usdToCnyRate, forKey: "usdToCnyRate")
+        }
+    }
+
+    /// A TextField can submit 0 or negatives; keep the rate usable no
+    /// matter where the write came from.
+    static func clampRate(_ rate: Double) -> Double {
+        guard rate.isFinite else { return Defaults.usdToCnyRate }
+        return min(max(rate, Defaults.usdToCnyRateRange.lowerBound),
+                   Defaults.usdToCnyRateRange.upperBound)
     }
     @Published var launchAtLogin: Bool {
         didSet {
@@ -57,13 +82,15 @@ final class Settings: ObservableObject {
         let interval = defaults.double(forKey: "refreshInterval")
         refreshInterval = RefreshInterval(rawValue: interval) ?? .fiveMinutes
         tokscalePath = defaults.string(forKey: "tokscalePath") ?? ""
-        unitStyle = UnitStyle(rawValue: defaults.string(forKey: "unitStyle") ?? "") ?? .western
         let savedLanguage = AppLanguage(rawValue: defaults.string(forKey: "language") ?? "") ?? .systemDefault
         language = savedLanguage
+        // zh defaults to 千/万 units, en to K/M/B; an explicit saved choice wins.
+        unitStyle = UnitStyle(rawValue: defaults.string(forKey: "unitStyle") ?? "")
+            ?? (savedLanguage == .zh ? .chinese : .western)
         let savedCurrency = AppCurrency(rawValue: defaults.string(forKey: "currency") ?? "")
         currency = savedCurrency ?? (savedLanguage == .zh ? .cny : .usd)
         let rate = defaults.double(forKey: "usdToCnyRate")
-        usdToCnyRate = rate > 0 ? rate : 7.2
+        usdToCnyRate = rate > 0 ? Self.clampRate(rate) : Defaults.usdToCnyRate
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

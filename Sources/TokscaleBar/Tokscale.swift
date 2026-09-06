@@ -247,7 +247,7 @@ final class TokscaleService {
 // MARK: - Formatting
 
 enum Format {
-    static func cost(_ value: Double, currency: AppCurrency = .usd, rate: Double = 7.2) -> String {
+    static func cost(_ value: Double, currency: AppCurrency = .usd, rate: Double = Defaults.usdToCnyRate) -> String {
         let amount = currency == .cny ? value * rate : value
         let symbol = currency.symbol
         if amount >= 100 { return String(format: "%@%.0f", symbol, amount) }
