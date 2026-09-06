@@ -42,14 +42,19 @@ struct PopoverView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 header
-                if let error = model.lastError {
-                    errorCard(error)
-                } else if let snapshot = model.snapshot {
+                if let snapshot = model.snapshot {
+                    // A failed refresh keeps the last good frame; the error
+                    // degrades to a banner instead of replacing the dashboard.
                     periodPicker
                     heroCard(report, snapshot: snapshot)
                     chartSection(snapshot)
                     modelBreakdown(report)
                     clientShare(report)
+                    if let error = model.lastError {
+                        errorCard(error)
+                    }
+                } else if let error = model.lastError {
+                    errorCard(error)
                 } else {
                     ProgressView().controlSize(.small)
                         .frame(maxWidth: .infinity, minHeight: 160)
