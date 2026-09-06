@@ -49,8 +49,16 @@ final class Settings: ObservableObject {
             let clamped = Self.clampRate(usdToCnyRate)
             if usdToCnyRate != clamped {
                 // Hop out of the TextField commit before publishing the
-                // correction back, so it can't land mid view-update.
-                DispatchQueue.main.async { self.usdToCnyRate = clamped }
+                // correction back, so it can't land mid view-update. Only
+                // correct if nothing newer was written meanwhile (NaN != NaN,
+                // so compare it structurally).
+                let written = usdToCnyRate
+                DispatchQueue.main.async {
+                    let current = self.usdToCnyRate
+                    if current == written || (current.isNaN && written.isNaN) {
+                        self.usdToCnyRate = clamped
+                    }
+                }
                 return
             }
             guard persists else { return }
