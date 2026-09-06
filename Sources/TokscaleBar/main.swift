@@ -109,7 +109,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Tokscale")
+            // Template rendering lets macOS adapt the glyph to the menu bar
+            // (dark/light, wallpaper tint) instead of drawing it flat green.
+            let image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Tokscale")
+            image?.isTemplate = true
+            button.image = image
             button.imagePosition = .imageLeading
             button.action = #selector(togglePopover)
             button.target = self

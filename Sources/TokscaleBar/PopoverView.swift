@@ -358,16 +358,21 @@ struct PopoverView: View {
         String(format: "%+.0f%%", delta * 100)
     }
 
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
     private func isToday(_ date: String) -> Bool {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return date == formatter.string(from: Date())
+        date == Self.dayFormatter.string(from: Date())
     }
 
     private func weekdayLetter(_ date: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let d = formatter.date(from: date) else { return "" }
+        guard let d = Self.dayFormatter.date(from: date) else { return "" }
         return l10n.weekdayLetters[Calendar.current.component(.weekday, from: d) - 1]
     }
 }
