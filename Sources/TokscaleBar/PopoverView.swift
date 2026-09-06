@@ -45,14 +45,15 @@ struct PopoverView: View {
                 if let snapshot = model.snapshot {
                     // A failed refresh keeps the last good frame; the error
                     // degrades to a banner instead of replacing the dashboard.
+                    // It sits above the hero so it's visible without scrolling.
                     periodPicker
+                    if let error = model.lastError {
+                        errorCard(error)
+                    }
                     heroCard(report, snapshot: snapshot)
                     chartSection(snapshot)
                     modelBreakdown(report)
                     clientShare(report)
-                    if let error = model.lastError {
-                        errorCard(error)
-                    }
                 } else if let error = model.lastError {
                     errorCard(error)
                 } else {
