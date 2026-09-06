@@ -53,7 +53,13 @@ struct L10n {
         zh ? "\(count) 条消息" : "\(count) messages"
     }
 
+    /// "tokens" stays untranslated in zh — it's the industry term.
+    func tokensPill(_ formattedCount: String) -> String {
+        "\(formattedCount) tokens"
+    }
+
     var vsYesterday: String { zh ? "较昨日" : "vs yesterday" }
+    var quit: String { zh ? "退出" : "Quit" }
 
     // Charts
     var hourlyChart: String { zh ? "分时段" : "Hourly" }

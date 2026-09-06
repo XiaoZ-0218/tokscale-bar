@@ -132,7 +132,7 @@ struct PopoverView: View {
                 }
             }
             HStack(spacing: 8) {
-                heroStat(icon: "number", text: "\(Format.tokens(report.totalTokens, settings.unitStyle)) tokens")
+                heroStat(icon: "number", text: l10n.tokensPill(Format.tokens(report.totalTokens, settings.unitStyle)))
                 heroStat(icon: "bubble.left.and.bubble.right", text: l10n.messagesPill(report.totalMessages))
             }
         }
@@ -193,8 +193,15 @@ struct PopoverView: View {
                          maxBarHeight: 52)
                 weekAxis(snapshot.weekDays)
             case .month:
-                AreaChart(values: snapshot.monthDays.map(\.totals.cost))
-                    .frame(height: 64)
+                let values = snapshot.monthDays.map(\.totals.cost)
+                if values.count <= 1 {
+                    // AreaChart needs at least two points; on the 1st of the
+                    // month show a single bar instead of a blank canvas.
+                    BarChart(values: values, highlight: 0, maxBarHeight: 52)
+                } else {
+                    AreaChart(values: values)
+                        .frame(height: 64)
+                }
             }
         }
         .padding(12)
@@ -324,6 +331,7 @@ struct PopoverView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
+            .help(l10n.quit)
         }
     }
 
