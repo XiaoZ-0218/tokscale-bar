@@ -138,9 +138,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     /// `--render-png <path> [--period today|week|month] [--lang zh|en]
-    /// [--units western|chinese]`: renders once data arrives, then exits 0.
-    /// Exits non-zero on fetch error or after a 30s deadline (the 20s
-    /// subprocess timeout plus slack) so callers can never hang.
+    /// [--units western|chinese] [--currency usd|cny]`: renders once data
+    /// arrives, then exits 0. Exits non-zero on fetch error or after a 30s
+    /// deadline (the 20s subprocess timeout plus slack) so callers can
+    /// never hang.
     private func setupRenderPNG(path: String) {
         let args = CommandLine.arguments
         func argValue(_ flag: String) -> String? {
@@ -153,6 +154,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         if let units = argValue("--units"), let style = UnitStyle(rawValue: units) {
             model.settings.unitStyle = style
+        }
+        if let currency = argValue("--currency"), let c = AppCurrency(rawValue: currency) {
+            model.settings.currency = c
         }
         let period = argValue("--period").flatMap(Period.init(rawValue:)) ?? .today
 

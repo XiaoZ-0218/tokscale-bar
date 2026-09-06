@@ -47,7 +47,7 @@ For development, `swift run` runs it in the foreground. Releases are built by Gi
 ### Debug flags
 
 - `--preview-window` — show the popover content in a regular window
-- `--render-png <path> [--period today|week|month] [--lang zh|en] [--units western|chinese]` — render the dashboard offscreen to a PNG (used to generate the screenshots above)
+- `--render-png <path> [--period today|week|month] [--lang zh|en] [--units western|chinese] [--currency usd|cny]` — render the dashboard offscreen to a PNG (used to generate the screenshots above)
 
 ### How it works
 
@@ -96,7 +96,7 @@ open TokscaleBar.app  # 启动（无 Dock 图标，只看菜单栏）
 ### 调试参数
 
 - `--preview-window` — 把弹窗内容显示在普通窗口里，方便预览
-- `--render-png <路径> [--period today|week|month] [--lang zh|en] [--units western|chinese]` — 离屏渲染仪表盘为 PNG（README 截图就是这样生成的）
+- `--render-png <路径> [--period today|week|month] [--lang zh|en] [--units western|chinese] [--currency usd|cny]` — 离屏渲染仪表盘为 PNG（README 截图就是这样生成的）
 
 ### 文件结构
 
