@@ -84,7 +84,7 @@ final class Settings: ObservableObject {
         tokscalePath = defaults.string(forKey: "tokscalePath") ?? ""
         let savedLanguage = AppLanguage(rawValue: defaults.string(forKey: "language") ?? "") ?? .systemDefault
         language = savedLanguage
-        // zh defaults to 千/万 units, en to K/M/B; an explicit saved choice wins.
+        // zh defaults to 万/亿 units, en to K/M/B; an explicit saved choice wins.
         unitStyle = UnitStyle(rawValue: defaults.string(forKey: "unitStyle") ?? "")
             ?? (savedLanguage == .zh ? .chinese : .western)
         let savedCurrency = AppCurrency(rawValue: defaults.string(forKey: "currency") ?? "")
