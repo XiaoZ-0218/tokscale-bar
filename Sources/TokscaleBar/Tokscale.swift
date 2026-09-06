@@ -110,6 +110,9 @@ final class TokscaleService {
         process.arguments = arguments
         process.standardOutput = stdout
         process.standardError = stderr
+
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
         try process.run()
 
         // Drain both pipes concurrently: a child that fills stderr's ~64KB
@@ -128,18 +131,20 @@ final class TokscaleService {
             reads.leave()
         }
 
-        let deadline = Date().addingTimeInterval(timeout)
-        while process.isRunning, Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-        if process.isRunning {
+        if exited.wait(timeout: .now() + timeout) == .timedOut {
             process.terminate() // SIGTERM
-            Thread.sleep(forTimeInterval: 0.5)
-            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-            reads.wait()
+            if exited.wait(timeout: .now() + 1) == .timedOut {
+                kill(process.processIdentifier, SIGKILL)
+                _ = exited.wait(timeout: .now() + 1)
+            }
+            process.waitUntilExit()
+            // A killed child can leave the pipes held open by a grandchild,
+            // so the drain wait must be bounded too. The read threads may
+            // leak in that case; the UI still recovers.
+            _ = reads.wait(timeout: .now() + 1)
             throw TokscaleError.timedOut
         }
-        process.waitUntilExit()
+        process.waitUntilExit() // no-op once terminated; settles terminationStatus
         reads.wait()
         guard process.terminationStatus == 0 else {
             let msg = String(data: errData, encoding: .utf8) ?? ""
