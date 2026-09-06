@@ -86,27 +86,35 @@ final class PaddingTests: XCTestCase {
         XCTAssertEqual(hours[8].cost, 0)
     }
 
-    func testPadWeekEndsTodayAndToleratesDuplicateDates() {
-        let today = Self.dayFormatter.string(from: Date())
-        let days = TokscaleService.padWeek([day(today, cost: 1), day(today, cost: 2)])
+    /// A fixed instant so tests never flake across midnight.
+    private let fixedNow: Date = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = .autoupdatingCurrent
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        return f.date(from: "2026-09-06 12:00")!
+    }()
+
+    func testPadWeekEndsOnNowAndToleratesDuplicateDates() {
+        let today = Self.dayFormatter.string(from: fixedNow)
+        let days = TokscaleService.padWeek([day(today, cost: 1), day(today, cost: 2)], now: fixedNow)
         XCTAssertEqual(days.count, 7)
-        XCTAssertEqual(days.last?.date, today)
+        XCTAssertEqual(days.last?.date, "2026-09-06")
+        XCTAssertEqual(days.first?.date, "2026-08-31")
         XCTAssertEqual(days.last?.totals.cost, 2) // last duplicate wins
     }
 
     func testPadMonthStartsOnTheFirst() {
-        let days = TokscaleService.padMonth([])
-        // Same calendar the implementation uses (Gregorian, local tz).
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .autoupdatingCurrent
-        XCTAssertEqual(days.count, calendar.component(.day, from: Date()))
-        let firstDay = Self.dayFormatter.date(from: days[0].date).map { calendar.component(.day, from: $0) }
-        XCTAssertEqual(firstDay, 1)
+        let days = TokscaleService.padMonth([], now: fixedNow)
+        XCTAssertEqual(days.count, 6) // Sep 1...6
+        XCTAssertEqual(days.first?.date, "2026-09-01")
+        XCTAssertEqual(days.last?.date, "2026-09-06")
     }
 
     func testPadMonthToleratesDuplicateDates() {
-        let today = Self.dayFormatter.string(from: Date())
-        let days = TokscaleService.padMonth([day(today, cost: 1), day(today, cost: 2)])
+        let today = Self.dayFormatter.string(from: fixedNow)
+        let days = TokscaleService.padMonth([day(today, cost: 1), day(today, cost: 2)], now: fixedNow)
         XCTAssertEqual(days.last?.totals.cost, 2) // last duplicate wins
     }
 }
