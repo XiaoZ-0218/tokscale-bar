@@ -21,9 +21,11 @@ cp Info.plist "$APP/Contents/"
 
 if [ -n "$VERSION" ]; then
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP/Contents/Info.plist"
 fi
 
-# Ad-hoc sign so Gatekeeper and login-item registration behave.
-codesign --force --deep --sign - "$APP" 2>/dev/null || true
+# Ad-hoc sign so Gatekeeper and login-item registration behave. A failed
+# signing must fail the build, not ship an unsigned bundle.
+codesign --force --deep --sign - "$APP" 2>/dev/null
 
 echo "Built $APP"
