@@ -113,6 +113,8 @@ struct L10n {
         case .binaryNotFound:
             return zh ? "找不到 tokscale，请在设置里指定路径"
                       : "tokscale not found — set its path in Settings"
+        case .timedOut:
+            return zh ? "tokscale 超时，请稍后重试" : "tokscale timed out"
         case .failed(let message):
             if !message.isEmpty { return message }
             return zh ? "tokscale 执行失败" : "tokscale failed"
