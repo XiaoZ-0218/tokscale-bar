@@ -149,25 +149,31 @@ final class TokscaleService {
         }
 
         if exited.wait(timeout: .now() + timeout) == .timedOut {
-            if process.isRunning, process.processIdentifier > 0 {
-                process.terminate() // SIGTERM
+            if process.isRunning {
+                if process.processIdentifier > 0 { process.terminate() } // SIGTERM
+                if exited.wait(timeout: .now() + 1) == .timedOut,
+                   process.isRunning, process.processIdentifier > 0 {
+                    kill(process.processIdentifier, SIGKILL)
+                    _ = exited.wait(timeout: .now() + 1)
+                }
+                process.waitUntilExit()
+                // A killed child can leave the pipes held open by a
+                // grandchild; bound the drain, then close the read ends so
+                // stuck reader threads unblock instead of leaking.
+                _ = reads.wait(timeout: .now() + 1)
+                try? stdout.fileHandleForReading.close()
+                try? stderr.fileHandleForReading.close()
+                throw TokscaleError.timedOut
             }
-            if exited.wait(timeout: .now() + 1) == .timedOut,
-               process.isRunning, process.processIdentifier > 0 {
-                kill(process.processIdentifier, SIGKILL)
-                _ = exited.wait(timeout: .now() + 1)
-            }
-            process.waitUntilExit()
-            // A killed child can leave the pipes held open by a grandchild,
-            // so the drain wait must be bounded too. The read threads may
-            // leak in that case; the UI still recovers.
-            _ = reads.wait(timeout: .now() + 1)
-            throw TokscaleError.timedOut
+            // else: exited on its own right at the deadline — fall through
+            // and treat it like a normal exit.
         }
         process.waitUntilExit() // no-op once terminated; settles terminationStatus
         // The process is dead, so its output is already in the pipe buffers;
         // if a grandchild holds them open, fail instead of blocking forever.
         if reads.wait(timeout: .now() + 2) == .timedOut {
+            try? stdout.fileHandleForReading.close()
+            try? stderr.fileHandleForReading.close()
             throw TokscaleError.failed("tokscale exited but its output streams never closed")
         }
         guard process.terminationStatus == 0 else {
