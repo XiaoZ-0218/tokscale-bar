@@ -42,7 +42,7 @@ Grab the latest release from [Releases](../../releases) — `TokscaleBar-*-macOS
 open TokscaleBar.app  # launch (menu bar only, no Dock icon)
 ```
 
-For development, `swift run` runs it in the foreground. Releases are built by GitHub Actions: push a `v*` tag and the Release workflow builds a universal binary, packages the zip, and publishes it with generated notes.
+For development, `swift run` runs it in the foreground. Releases are built by GitHub Actions: push a `v*` tag and the Release workflow builds a universal binary, packages the DMG + zip, and publishes them with generated notes.
 
 ### Debug flags
 
@@ -91,7 +91,12 @@ All data stays local.
 open TokscaleBar.app  # 启动（无 Dock 图标，只看菜单栏）
 ```
 
-发布由 GitHub Actions 自动完成：推送 `v*` 标签即可触发 Release 工作流，自动构建通用二进制、打包 zip 并发布 Release。
+发布由 GitHub Actions 自动完成：推送 `v*` 标签即可触发 Release 工作流，自动构建通用二进制、打包 DMG + zip 并发布 Release。
+
+### 调试参数
+
+- `--preview-window` — 把弹窗内容显示在普通窗口里，方便预览
+- `--render-png <路径> [--period today|week|month] [--lang zh|en] [--units western|chinese]` — 离屏渲染仪表盘为 PNG（README 截图就是这样生成的）
 
 ### 文件结构
 
