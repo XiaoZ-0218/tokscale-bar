@@ -110,6 +110,22 @@ final class TokscaleService {
     /// Max wall-clock time for one tokscale invocation before SIGTERM/SIGKILL.
     private let timeout: TimeInterval = 20
 
+    /// Apps launched by Finder/launchd get a bare PATH ("/usr/bin:/bin:…"),
+    /// but tokscale is a `#!/usr/bin/env node` script and node lives in the
+    /// Homebrew prefix — without it, the child dies with
+    /// "env: node: No such file or directory". Prepend the usual prefixes
+    /// unless they already appear, so a user's own PATH ordering still wins.
+    static func childEnvironment(base: [String: String] = ProcessInfo.processInfo.environment) -> [String: String] {
+        var env = base
+        let current = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
+        var components = current.split(separator: ":").map(String.init)
+        for prefix in ["/usr/local/bin", "/opt/homebrew/bin"] where !components.contains(prefix) {
+            components.insert(prefix, at: 0)
+        }
+        env["PATH"] = components.joined(separator: ":")
+        return env
+    }
+
     private func run(_ arguments: [String]) throws -> Data {
         let binary = try resolveBinary()
         let process = Process()
@@ -117,6 +133,7 @@ final class TokscaleService {
         let stderr = Pipe()
         process.executableURL = URL(fileURLWithPath: binary)
         process.arguments = arguments
+        process.environment = Self.childEnvironment()
         process.standardOutput = stdout
         process.standardError = stderr
 

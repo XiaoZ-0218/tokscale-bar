@@ -130,6 +130,30 @@ final class ClampRateTests: XCTestCase {
     }
 }
 
+final class ChildEnvironmentTests: XCTestCase {
+    /// The bug: Finder-launched apps get a bare PATH, so tokscale's
+    /// `#!/usr/bin/env node` shebang fails with "env: node: No such file
+    /// or directory". The child PATH must include the Homebrew prefixes.
+    func testAddsHomebrewPrefixesToBareFinderPath() {
+        let env = TokscaleService.childEnvironment(base: ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"])
+        let components = env["PATH"]!.split(separator: ":").map(String.init)
+        XCTAssertTrue(components.contains("/opt/homebrew/bin"))
+        XCTAssertTrue(components.contains("/usr/local/bin"))
+        XCTAssertLessThan(components.firstIndex(of: "/opt/homebrew/bin")!,
+                          components.firstIndex(of: "/usr/bin")!)
+    }
+
+    func testDoesNotDuplicateExistingPrefixes() {
+        let env = TokscaleService.childEnvironment(base: ["PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"])
+        XCTAssertEqual(env["PATH"], "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin")
+    }
+
+    func testMissingPathFallsBackToSystemDefault() {
+        let env = TokscaleService.childEnvironment(base: [:])
+        XCTAssertTrue(env["PATH"]!.contains("/usr/bin"))
+    }
+}
+
 final class L10nErrorTests: XCTestCase {
     func testTimeoutCopy() {
         XCTAssertEqual(L10n(language: .zh).errorText(TokscaleError.timedOut), "tokscale 超时，请稍后重试")
