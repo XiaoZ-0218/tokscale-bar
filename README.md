@@ -13,11 +13,12 @@ A lightweight macOS menu bar app that turns your local [tokscale](https://github
 ### Features
 
 - **Menu bar number**: today's spend (switchable to tokens / messages)
-- **Rich popover dashboard** with three period tabs (Today / 7 Days / 30 Days):
+- **Rich popover dashboard** with four period tabs (Today / 7 Days / 30 Days / All):
   - Gradient hero card with spend, token & message pills, and a day-over-day delta badge
   - Today → 24-hour bar chart with the current hour highlighted
   - 7 Days → daily bar chart with today highlighted
   - 30 Days → daily bar chart with today highlighted
+  - All → monthly bar chart with the current month highlighted
   - Top-5 model breakdown (model, client, tokens, cost, relative-share bar)
   - Client share: stacked proportion bar with legend
 - **Bilingual UI**: 中文 / English switcher (follows system by default)
@@ -49,13 +50,13 @@ For development, `swift run` runs it in the foreground. Releases are built by Gi
 
 - `--preview-window` — show the popover content in a regular window; honors the appearance/state flags below
 - `--render-png <path> [flags]` — render offscreen to a PNG (used to generate the screenshots above)
-- Appearance flags: `--period today|week|last30`, `--lang zh|en`, `--units western|chinese`, `--currency usd|cny`
+- Appearance flags: `--period today|week|last30|all`, `--lang zh|en`, `--units western|chinese`, `--currency usd|cny`
 - State flags: `--mock` (deterministic fake data, no tokscale needed) and `--state empty|error|settings` — e.g. `--render-png shot.png --mock --state settings` for fast UI iteration without touching real data
 
 ### How it works
 
 Pure AppKit + SwiftUI, zero third-party dependencies. The app spawns the local
-`tokscale` CLI (`--json --today/--week`, `--json --since/--until` for the last 30 days, `hourly --json --today`, `graph`)
+`tokscale` CLI (`--json --today/--week`, bare `--json` for all time, `--json --since/--until` for the last 30 days, `hourly --json --today`, `graph`)
 concurrently via `Process` (last 30 days uses `--since/--until`), decodes the JSON, and refreshes on a timer.
 All data stays local.
 
@@ -69,11 +70,12 @@ All data stays local.
 ### 功能
 
 - **菜单栏实时数字**：今日花费（可切换为 Tokens / 消息数）
-- **丰富仪表盘**，三个时段页签（今天 / 近 7 天 / 近 30 天）：
+- **丰富仪表盘**，四个时段页签（今天 / 近 7 天 / 近 30 天 / 全部）：
   - 渐变花费大卡片（Tokens、消息数胶囊，今日附「较昨日」涨跌）
   - 今天 → 24 小时分时段柱状图（当前小时高亮）
   - 近 7 天 → 每日柱状图（今天高亮）
   - 近 30 天 → 每日柱状图（今天高亮）
+  - 全部 → 每月柱状图（当月高亮）
   - 模型 TOP 5 明细（模型、客户端、Tokens、费用、占比底条）
   - 客户端占比堆叠条 + 图例
 - **中英双语**：设置里一键切换 中文 / English（默认跟随系统）
@@ -101,7 +103,7 @@ open TokscaleBar.app  # 启动（无 Dock 图标，只看菜单栏）
 
 - `--preview-window` — 把弹窗内容显示在普通窗口里，同样支持下面的外观/状态参数
 - `--render-png <路径> [参数]` — 离屏渲染为 PNG（README 截图就是这样生成的）
-- 外观参数：`--period today|week|last30`、`--lang zh|en`、`--units western|chinese`、`--currency usd|cny`
+- 外观参数：`--period today|week|last30|all`、`--lang zh|en`、`--units western|chinese`、`--currency usd|cny`
 - 状态参数：`--mock`（确定性假数据，无需 tokscale）和 `--state empty|error|settings`——例如 `--render-png shot.png --mock --state settings`，不碰真实数据就能快速迭代 UI
 
 ### 文件结构
