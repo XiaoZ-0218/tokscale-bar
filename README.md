@@ -109,6 +109,7 @@ Sources/TokscaleBar/
 ├── main.swift                    入口、AppDelegate、状态栏与定时刷新
 ├── Tokscale.swift                tokscale 并发抓取、JSON 模型、数字格式化
 ├── Settings.swift                用户设置（UserDefaults + 登录项）
+├── Theme.swift                   设计令牌：品牌色、渐变、卡片样式
 ├── L10n.swift                    中英双语文案与语言/单位/货币枚举
 ├── Charts.swift                  柱状图、面积图、客户端占比组件
 └── PopoverView.swift             仪表盘（时段页签）与设置界面

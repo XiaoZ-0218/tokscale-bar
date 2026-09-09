@@ -578,6 +578,12 @@ struct SettingsView: View {
 
             Spacer(minLength: 0)
 
+            if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+                Text("TokscaleBar v\(version)")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
             Text(l10n.privacyNote)
                 .font(.system(size: 9))
                 .foregroundStyle(.tertiary)
