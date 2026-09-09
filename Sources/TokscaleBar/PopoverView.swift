@@ -31,7 +31,7 @@ struct PopoverView: View {
             }
         }
         .frame(width: 324)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(PopoverBackground())
     }
 
     // MARK: - Dashboard
@@ -328,10 +328,18 @@ struct PopoverView: View {
             Button(action: model.refresh) {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 10, weight: .medium))
+                    .rotationEffect(.degrees(model.isRefreshing ? 360 : 0))
+                    .animation(
+                        model.isRefreshing
+                            ? .linear(duration: 0.9).repeatForever(autoreverses: false)
+                            : .default,
+                        value: model.isRefreshing
+                    )
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .disabled(model.isRefreshing)
+            .help(l10n.refreshNow)
             Button(action: { NSApplication.shared.terminate(nil) }) {
                 Image(systemName: "power")
                     .font(.system(size: 10, weight: .medium))
@@ -346,11 +354,19 @@ struct PopoverView: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
             Text(error).font(.system(size: 11)).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Button(l10n.retry, action: model.refresh)
+                .font(.system(size: 10, weight: .semibold))
+                .buttonStyle(.plain)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(.orange.opacity(0.15), in: Capsule())
+                .disabled(model.isRefreshing)
         }
         .foregroundStyle(.orange)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .card(radius: 10)
     }
 
     private func sectionTitle(_ text: String) -> some View {
@@ -581,4 +597,18 @@ struct SettingsView: View {
     private var rowDivider: some View {
         Rectangle().fill(.primary.opacity(0.06)).frame(height: 1)
     }
+}
+
+/// Native popover vibrancy: lets the desktop bleed through like Spotlight
+/// panels do, instead of a flat opaque slab.
+private struct PopoverBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
