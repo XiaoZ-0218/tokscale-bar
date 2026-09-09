@@ -13,6 +13,18 @@ final class AppModel: ObservableObject {
 
     let settings = Settings()
     private let service = TokscaleService()
+
+    /// Debug (`--mock` / `--state empty`): fixed data that freezes fetching.
+    var pinnedSnapshot: Snapshot? {
+        didSet {
+            fetchesLiveData = pinnedSnapshot == nil
+            snapshot = pinnedSnapshot
+            lastUpdated = Date()
+        }
+    }
+    /// Debug (`--state error`): when false, refresh() is a no-op and any
+    /// in-flight fetch is dropped on completion.
+    var fetchesLiveData = true
     private var timer: Timer?
     private var currentInterval: TimeInterval = 0
 
@@ -42,7 +54,7 @@ final class AppModel: ObservableObject {
     }
 
     func refresh() {
-        guard !isRefreshing else { return }
+        guard fetchesLiveData, !isRefreshing else { return }
         isRefreshing = true
         lastError = nil // a new attempt starts; don't show the stale failure
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -54,12 +66,14 @@ final class AppModel: ObservableObject {
             do {
                 let snapshot = try self.service.fetchSnapshot()
                 DispatchQueue.main.async {
+                    guard self.fetchesLiveData else { return }
                     self.snapshot = snapshot
                     self.lastError = nil
                     self.lastUpdated = Date()
                 }
             } catch {
                 DispatchQueue.main.async {
+                    guard self.fetchesLiveData else { return }
                     self.lastError = self.settings.l10n.errorText(error)
                 }
             }
@@ -77,6 +91,31 @@ final class AppModel: ObservableObject {
     }
 }
 
+/// Shared parsing for the debug appearance flags honored by both
+/// `--preview-window` and `--render-png`.
+struct DebugFlags {
+    enum State: String { case live, empty, error, settings }
+    var period: Period = .today
+    var language: AppLanguage?
+    var units: UnitStyle?
+    var currency: AppCurrency?
+    var mock = false
+    var state: State = .live
+
+    init(_ args: [String] = CommandLine.arguments) {
+        func value(_ flag: String) -> String? {
+            guard let i = args.firstIndex(of: flag), args.indices.contains(i + 1) else { return nil }
+            return args[i + 1]
+        }
+        period = value("--period").flatMap(Period.init) ?? .today
+        language = value("--lang").flatMap(AppLanguage.init)
+        units = value("--units").flatMap(UnitStyle.init)
+        currency = value("--currency").flatMap(AppCurrency.init)
+        mock = args.contains("--mock")
+        state = value("--state").flatMap(State.init) ?? .live
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
@@ -89,7 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // it must never touch the status bar.
         if let idx = CommandLine.arguments.firstIndex(of: "--render-png") {
             guard CommandLine.arguments.indices.contains(idx + 1) else {
-                FileHandle.standardError.write(Data("usage: --render-png <path> [--period today|week|month] [--lang zh|en] [--units western|chinese] [--currency usd|cny]\n".utf8))
+                FileHandle.standardError.write(Data("usage: --render-png <path> [--period today|week|month] [--lang zh|en] [--units western|chinese] [--currency usd|cny] [--mock] [--state live|empty|error|settings]\n".utf8))
                 exit(2)
             }
             setupRenderPNG(path: CommandLine.arguments[idx + 1])
@@ -98,16 +137,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         // Debug: `--preview-window` shows the popover content in a regular window.
         if CommandLine.arguments.contains("--preview-window") {
+            let flags = DebugFlags()
+            applyDebugFlags(flags)
+            let controller = NSHostingController(
+                rootView: PopoverView(model: model, settings: model.settings, initialPeriod: flags.period)
+            )
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 320, height: 520),
+                contentRect: NSRect(x: 0, y: 0, width: 324, height: 520),
                 styleMask: [.titled, .closable],
                 backing: .buffered, defer: false
             )
             window.title = "TokscaleBar Preview"
-            window.contentViewController = NSHostingController(
-                rootView: PopoverView(model: model, settings: model.settings)
-            )
-            window.setFrameOrigin(NSPoint(x: 260, y: 300))
+            window.contentViewController = controller
+            // Hug the content like the popover does, capped so tall states
+            // (dashboard with all sections) still fit on small screens.
+            let fit = controller.view.fittingSize
+            window.setContentSize(NSSize(width: 324, height: min(fit.height, 720)))
+            window.center()
             window.makeKeyAndOrderFront(nil)
         }
 
@@ -142,29 +188,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         updateTitle()
     }
 
-    /// `--render-png <path> [--period today|week|month] [--lang zh|en]
-    /// [--units western|chinese] [--currency usd|cny]`: renders once data
-    /// arrives, then exits 0. Exits non-zero on fetch error or after a 30s
-    /// deadline (the 20s subprocess timeout plus slack) so callers can
-    /// never hang.
-    private func setupRenderPNG(path: String) {
-        let args = CommandLine.arguments
-        func argValue(_ flag: String) -> String? {
-            guard let i = args.firstIndex(of: flag), args.indices.contains(i + 1) else { return nil }
-            return args[i + 1]
+    /// Applies debug appearance and state flags. Persistence is disabled so
+    /// a debug run never dirties the user's real settings.
+    private func applyDebugFlags(_ flags: DebugFlags) {
+        let settings = model.settings
+        settings.persists = false
+        if let language = flags.language { settings.language = language }
+        if let units = flags.units { settings.unitStyle = units }
+        if let currency = flags.currency { settings.currency = currency }
+        if flags.mock { model.pinnedSnapshot = Mock.snapshot }
+        switch flags.state {
+        case .live: break
+        case .empty: model.pinnedSnapshot = Mock.empty
+        case .error:
+            model.fetchesLiveData = false
+            model.lastError = settings.l10n.errorText(TokscaleError.binaryNotFound)
+        case .settings: model.showSettings = true
         }
-        model.settings.persists = false
-        if let lang = argValue("--lang"), let language = AppLanguage(rawValue: lang) {
-            model.settings.language = language
-        }
-        if let units = argValue("--units"), let style = UnitStyle(rawValue: units) {
-            model.settings.unitStyle = style
-        }
-        if let currency = argValue("--currency"), let c = AppCurrency(rawValue: currency) {
-            model.settings.currency = c
-        }
-        let period = argValue("--period").flatMap(Period.init(rawValue:)) ?? .today
+    }
 
+    /// `--render-png <path> [--period today|week|month] [--lang zh|en]
+    /// [--units western|chinese] [--currency usd|cny] [--mock]
+    /// [--state live|empty|error|settings]`: renders once data arrives,
+    /// then exits 0. Static states (`--mock` / non-live `--state`) skip the
+    /// fetch entirely. In live mode, exits non-zero on fetch error or after
+    /// a 30s deadline (the 20s subprocess timeout plus slack) so callers
+    /// can never hang.
+    private func setupRenderPNG(path: String) {
+        let flags = DebugFlags()
+        applyDebugFlags(flags)
+
+        // Static states need no fetch: give SwiftUI a runloop turn to lay
+        // out, then rasterize straight away.
+        if flags.mock || flags.state != .live {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self else { return }
+                guard Self.renderPNG(model: self.model, period: flags.period, to: path) else {
+                    FileHandle.standardError.write(Data("render-png: failed to write \(path)\n".utf8))
+                    exit(1)
+                }
+                NSApplication.shared.terminate(nil)
+            }
+            return
+        }
+
+        let period = flags.period
         model.$snapshot.compactMap { $0 }.first().sink { [weak self] _ in
             // Give SwiftUI a runloop turn to lay out before rasterizing.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
