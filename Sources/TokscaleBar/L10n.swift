@@ -37,7 +37,7 @@ struct L10n {
         switch period {
         case .today: return zh ? "今天" : "Today"
         case .week: return zh ? "近 7 天" : "7 Days"
-        case .month: return zh ? "本月" : "Month"
+        case .last30: return zh ? "近 30 天" : "30 Days"
         }
     }
 
@@ -45,7 +45,7 @@ struct L10n {
         switch period {
         case .today: return zh ? "今日花费" : "Today's Spend"
         case .week: return zh ? "近 7 天花费" : "Last 7 Days"
-        case .month: return zh ? "本月花费" : "This Month"
+        case .last30: return zh ? "近 30 天花费" : "Last 30 Days"
         }
     }
 

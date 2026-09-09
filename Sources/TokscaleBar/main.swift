@@ -128,7 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // it must never touch the status bar.
         if let idx = CommandLine.arguments.firstIndex(of: "--render-png") {
             guard CommandLine.arguments.indices.contains(idx + 1) else {
-                FileHandle.standardError.write(Data("usage: --render-png <path> [--period today|week|month] [--lang zh|en] [--units western|chinese] [--currency usd|cny] [--mock] [--state live|empty|error|settings]\n".utf8))
+                FileHandle.standardError.write(Data("usage: --render-png <path> [--period today|week|last30] [--lang zh|en] [--units western|chinese] [--currency usd|cny] [--mock] [--state live|empty|error|settings]\n".utf8))
                 exit(2)
             }
             setupRenderPNG(path: CommandLine.arguments[idx + 1])
@@ -207,7 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    /// `--render-png <path> [--period today|week|month] [--lang zh|en]
+    /// `--render-png <path> [--period today|week|last30] [--lang zh|en]
     /// [--units western|chinese] [--currency usd|cny] [--mock]
     /// [--state live|empty|error|settings]`: renders once data arrives,
     /// then exits 0. Static states (`--mock` / non-live `--state`) skip the

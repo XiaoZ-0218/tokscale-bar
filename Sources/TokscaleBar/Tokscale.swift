@@ -64,10 +64,10 @@ struct HourlyPayload: Decodable {
 struct Snapshot {
     let today: Report
     let week: Report
-    let month: Report
+    let last30: Report
     let hours: [HourUsage]      // always 24 entries, zero-filled
     let weekDays: [DayUsage]    // 7 entries ending today, zero-filled
-    let monthDays: [DayUsage]   // from the 1st to today, zero-filled
+    let last30Days: [DayUsage]  // 30 entries ending today, zero-filled
 }
 
 // MARK: - Service
@@ -204,13 +204,15 @@ final class TokscaleService {
     }
 
     private enum Job: Int, CaseIterable {
-        case today, week, month, hourly, graph
+        case today, week, last30, hourly, graph
 
         var arguments: [String] {
             switch self {
             case .today: return ["--json", "--today", "--no-spinner"]
             case .week: return ["--json", "--week", "--no-spinner"]
-            case .month: return ["--json", "--month", "--no-spinner"]
+            // tokscale has no "last N days" shortcut; --since/--until are inclusive.
+            case .last30: return ["--json", "--since", TokscaleService.dayString(daysAgo: 29),
+                                  "--until", TokscaleService.dayString(daysAgo: 0), "--no-spinner"]
             case .hourly: return ["hourly", "--json", "--today", "--no-spinner"]
             case .graph: return ["graph", "--no-spinner"]
             }
@@ -237,7 +239,7 @@ final class TokscaleService {
         }
         group.wait()
         guard let todayData = outputs[.today], let weekData = outputs[.week],
-              let monthData = outputs[.month], let hourlyData = outputs[.hourly],
+              let last30Data = outputs[.last30], let hourlyData = outputs[.hourly],
               let graphData = outputs[.graph] else {
             throw firstError ?? TokscaleError.failed("unknown")
         }
@@ -248,10 +250,10 @@ final class TokscaleService {
         return Snapshot(
             today: try decoder.decode(Report.self, from: todayData),
             week: try decoder.decode(Report.self, from: weekData),
-            month: try decoder.decode(Report.self, from: monthData),
+            last30: try decoder.decode(Report.self, from: last30Data),
             hours: Self.padHours(hourly),
-            weekDays: Self.padWeek(graph.contributions),
-            monthDays: Self.padMonth(graph.contributions)
+            weekDays: Self.padDays(graph.contributions, count: 7),
+            last30Days: Self.padDays(graph.contributions, count: 30)
         )
     }
 
@@ -290,22 +292,16 @@ final class TokscaleService {
         return (0..<24).map { HourUsage(hour: $0, cost: byHour[$0] ?? 0) }
     }
 
-    /// 7 days ending `now`, zero-filled. `now` is injectable for tests.
-    static func padWeek(_ days: [DayUsage], now: Date = Date()) -> [DayUsage] {
-        // graph can repeat a date; uniqueKeysWithValues would trap.
-        let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
-        return (0..<7).reversed().map { offset in
-            let date = calendar.date(byAdding: .day, value: -offset, to: now)!
-            let key = dayFormatter.string(from: date)
-            return byDate[key] ?? DayUsage(date: key, totals: .init(tokens: 0, cost: 0, messages: 0))
-        }
+    /// YYYY-MM-DD of `daysAgo` days before today, in the local time zone.
+    private static func dayString(daysAgo: Int) -> String {
+        dayFormatter.string(from: calendar.date(byAdding: .day, value: -daysAgo, to: Date())!)
     }
 
-    /// Days of the current month from the 1st to `now`, zero-filled.
-    static func padMonth(_ days: [DayUsage], now: Date = Date()) -> [DayUsage] {
+    /// `count` days ending `now`, zero-filled. `now` is injectable for tests.
+    static func padDays(_ days: [DayUsage], count: Int, now: Date = Date()) -> [DayUsage] {
+        // graph can repeat a date; uniqueKeysWithValues would trap.
         let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
-        let day = calendar.component(.day, from: now)
-        return (0..<day).reversed().map { offset in
+        return (0..<count).reversed().map { offset in
             let date = calendar.date(byAdding: .day, value: -offset, to: now)!
             let key = dayFormatter.string(from: date)
             return byDate[key] ?? DayUsage(date: key, totals: .init(tokens: 0, cost: 0, messages: 0))

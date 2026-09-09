@@ -33,49 +33,6 @@ struct BarChart: View {
     }
 }
 
-/// Smooth area+line chart for the month's daily costs.
-struct AreaChart: View {
-    let values: [Double]
-
-    var body: some View {
-        Canvas { context, size in
-            guard values.count > 1, size.width > 0, size.height > 0 else { return }
-            let peak = max(values.max() ?? 0, 0.0001)
-            let stepX = size.width / CGFloat(values.count - 1)
-            let points = values.enumerated().map { index, value in
-                CGPoint(x: CGFloat(index) * stepX,
-                        y: size.height - 3 - (size.height - 8) * CGFloat(value / peak))
-            }
-
-            var line = Path()
-            line.move(to: points[0])
-            for i in 1..<points.count {
-                let prev = points[i - 1]
-                let mid = CGPoint(x: (prev.x + points[i].x) / 2, y: (prev.y + points[i].y) / 2)
-                line.addQuadCurve(to: mid, control: prev)
-            }
-            line.addLine(to: points[points.count - 1])
-
-            var area = line
-            area.addLine(to: CGPoint(x: size.width, y: size.height))
-            area.addLine(to: CGPoint(x: 0, y: size.height))
-            area.closeSubpath()
-            context.fill(area, with: .linearGradient(
-                Gradient(colors: [Color.brand.opacity(0.35), Color.brand.opacity(0.02)]),
-                startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)
-            ))
-            context.stroke(line, with: .color(.brand.opacity(0.22)), lineWidth: 5)
-            context.stroke(line, with: .color(.brand), lineWidth: 1.5)
-
-            if let last = points.last {
-                let dot = Path(ellipseIn: CGRect(x: last.x - 3, y: last.y - 3, width: 6, height: 6))
-                context.fill(dot, with: .color(.brand))
-                context.stroke(dot, with: .color(.white), lineWidth: 1.5)
-            }
-        }
-    }
-}
-
 /// One horizontal stacked capsule showing cost share per client, with a legend.
 struct ClientShareView: View {
     let shares: [(client: String, cost: Double)]

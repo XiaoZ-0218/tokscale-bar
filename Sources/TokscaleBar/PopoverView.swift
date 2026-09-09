@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Period: String, CaseIterable, Identifiable {
-    case today, week, month
+    case today, week, last30
     var id: String { rawValue }
 }
 
@@ -76,7 +76,7 @@ struct PopoverView: View {
         switch period {
         case .today: return snapshot.today
         case .week: return snapshot.week
-        case .month: return snapshot.month
+        case .last30: return snapshot.last30
         }
     }
 
@@ -172,8 +172,8 @@ struct PopoverView: View {
             return Date.now.formatted(.dateTime.month(.abbreviated).day().locale(locale))
         case .week:
             return "\(shortDate(snapshot.weekDays.first?.date)) – \(shortDate(snapshot.weekDays.last?.date))"
-        case .month:
-            return Date.now.formatted(.dateTime.year().month(.abbreviated).locale(locale))
+        case .last30:
+            return "\(shortDate(snapshot.last30Days.first?.date)) – \(shortDate(snapshot.last30Days.last?.date))"
         }
     }
 
@@ -208,7 +208,7 @@ struct PopoverView: View {
             let values: [Double] = switch period {
             case .today: snapshot.hours.map(\.cost)
             case .week: snapshot.weekDays.map(\.totals.cost)
-            case .month: snapshot.monthDays.map(\.totals.cost)
+            case .last30: snapshot.last30Days.map(\.totals.cost)
             }
             if values.allSatisfy({ $0 <= 0 }) {
                 // Flat zero bars read as a rendering bug; say it's empty instead.
@@ -228,15 +228,11 @@ struct PopoverView: View {
                              highlight: values.count - 1,
                              maxBarHeight: 52)
                     weekAxis(snapshot.weekDays)
-                case .month:
-                    if values.count <= 1 {
-                        // AreaChart needs at least two points; on the 1st of the
-                        // month show a single bar instead of a blank canvas.
-                        BarChart(values: values, highlight: 0, maxBarHeight: 52)
-                    } else {
-                        AreaChart(values: values)
-                            .frame(height: 64)
-                    }
+                case .last30:
+                    BarChart(values: values,
+                             highlight: values.count - 1,
+                             maxBarHeight: 52)
+                    last30Axis(snapshot.last30Days)
                 }
             }
         }
@@ -251,8 +247,8 @@ struct PopoverView: View {
             return Date.now.formatted(.dateTime.month(.abbreviated).day().locale(locale))
         case .week:
             return "\(shortDate(snapshot.weekDays.first?.date)) – \(shortDate(snapshot.weekDays.last?.date))"
-        case .month:
-            return Date.now.formatted(.dateTime.month(.abbreviated).locale(locale))
+        case .last30:
+            return "\(shortDate(snapshot.last30Days.first?.date)) – \(shortDate(snapshot.last30Days.last?.date))"
         }
     }
 
@@ -273,6 +269,22 @@ struct PopoverView: View {
                 Text(weekdayLetter(day.date))
                     .font(.system(size: 8, weight: isToday(day.date) ? .bold : .regular))
                     .foregroundStyle(isToday(day.date) ? .primary : .tertiary)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    /// Sparse M/d ticks under the 30-day bars; empty texts keep spacing even.
+    private func last30Axis(_ days: [DayUsage]) -> some View {
+        let ticks: Set<Int> = [0, 14, 29]
+        return HStack(spacing: 0) {
+            ForEach(Array(days.enumerated()), id: \.offset) { index, day in
+                Text(ticks.contains(index) ? shortDate(day.date) : "")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.tertiary)
+                    // Ticks are sparse, so let labels overflow their narrow
+                    // slot instead of wrapping onto two lines.
+                    .fixedSize()
                     .frame(maxWidth: .infinity)
             }
         }

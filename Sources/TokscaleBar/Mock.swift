@@ -8,20 +8,20 @@ enum Mock {
         Snapshot(
             today: report(todayEntries),
             week: report(weekEntries),
-            month: report(monthEntries),
+            last30: report(last30Entries),
             hours: hourCurve,
             weekDays: pastDays(7, costs: [12.4, 28.1, 21.7, 35.2, 18.9, 41.5, 34.26]),
-            monthDays: monthDays()
+            last30Days: pastDays(30, costs: (1...30).map { 6 + 30 * abs(sin(Double($0) * 0.9)) })
         )
     }
 
     /// All-zero snapshot: exercises the chart empty state and ¥0 hero.
     static var empty: Snapshot {
         Snapshot(
-            today: .empty, week: .empty, month: .empty,
+            today: .empty, week: .empty, last30: .empty,
             hours: (0..<24).map { HourUsage(hour: $0, cost: 0) },
             weekDays: pastDays(7, costs: [0, 0, 0, 0, 0, 0, 0]),
-            monthDays: monthDays(cost: { _ in 0 })
+            last30Days: pastDays(30, costs: [Double](repeating: 0, count: 30))
         )
     }
 
@@ -44,7 +44,7 @@ enum Mock {
         entry("kimi", "k3-256k", 3_100_000, 1.05, 76),
     ]
 
-    private static let monthEntries: [Report.Entry] = weekEntries.map {
+    private static let last30Entries: [Report.Entry] = weekEntries.map {
         entry($0.client, $0.model, $0.tokens * 4, $0.cost * 4.2, $0.messageCount * 4)
     }
 
@@ -84,17 +84,6 @@ enum Mock {
             DayUsage(
                 date: dayString(Calendar.current.date(byAdding: .day, value: i - count + 1, to: Date())!),
                 totals: DayUsage.Totals(tokens: 0, cost: costs[i], messages: 0)
-            )
-        }
-    }
-
-    private static func monthDays(cost: (Int) -> Double = { 6 + 30 * abs(sin(Double($0) * 0.9)) }) -> [DayUsage] {
-        let calendar = Calendar.current
-        let today = calendar.component(.day, from: Date())
-        return (1...today).map { day in
-            DayUsage(
-                date: dayString(calendar.date(byAdding: .day, value: day - today, to: Date())!),
-                totals: DayUsage.Totals(tokens: 0, cost: cost(day), messages: 0)
             )
         }
     }
