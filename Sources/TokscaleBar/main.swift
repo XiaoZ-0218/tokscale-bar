@@ -121,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.imagePosition = .imageLeading
             button.action = #selector(togglePopover)
             button.target = self
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
 
         popover = NSPopover()
@@ -195,13 +196,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     @objc private func togglePopover() {
         guard let button = statusItem.button else { return }
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            showStatusMenu()
+            return
+        }
         if popover.isShown {
             popover.performClose(nil)
         } else {
             model.showSettings = false
-            model.refresh()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            openPopover()
         }
+    }
+
+    private func openPopover() {
+        guard let button = statusItem.button else { return }
+        model.refresh()
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+    }
+
+    @objc private func openSettings() {
+        model.showSettings = true
+        openPopover()
+    }
+
+    /// Right-click menu. `statusItem.menu` is set only for the click itself —
+    /// leaving it attached would swallow the left-click popover toggle.
+    private func showStatusMenu() {
+        let l10n = model.settings.l10n
+        let menu = NSMenu()
+        func item(_ title: String, _ symbol: String, _ action: Selector, _ key: String = "") {
+            let entry = NSMenuItem(title: title, action: action, keyEquivalent: key)
+            entry.target = self
+            entry.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            menu.addItem(entry)
+        }
+        item(l10n.refreshNow, "arrow.clockwise", #selector(menuRefresh), "r")
+        item(l10n.settingsTitle, "gearshape", #selector(openSettings), ",")
+        menu.addItem(.separator())
+        let quit = NSMenuItem(title: l10n.quitApp,
+                              action: #selector(NSApplication.terminate(_:)),
+                              keyEquivalent: "q")
+        quit.target = NSApp // AppDelegate doesn't implement terminate:
+        quit.image = NSImage(systemSymbolName: "power", accessibilityDescription: nil)
+        menu.addItem(quit)
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    @objc private func menuRefresh() {
+        model.refresh()
     }
 
     func popoverDidClose(_ notification: Notification) {

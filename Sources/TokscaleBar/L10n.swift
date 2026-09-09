@@ -60,6 +60,7 @@ struct L10n {
 
     var vsYesterday: String { zh ? "较昨日" : "vs yesterday" }
     var quit: String { zh ? "退出" : "Quit" }
+    var quitApp: String { zh ? "退出 TokscaleBar" : "Quit TokscaleBar" }
     var retry: String { zh ? "重试" : "Retry" }
     var refreshNow: String { zh ? "立即刷新" : "Refresh now" }
 
