@@ -160,8 +160,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             // Template rendering lets macOS adapt the glyph to the menu bar
-            // (dark/light, wallpaper tint) instead of drawing it flat green.
-            let image = NSImage(systemSymbolName: "bolt.fill", accessibilityDescription: "Tokscale")
+            // (dark/light, wallpaper tint). The outline bolt matches the
+            // single-line style of the app icon.
+            let image = NSImage(systemSymbolName: "bolt", accessibilityDescription: "Tokscale")
             image?.isTemplate = true
             button.image = image
             button.imagePosition = .imageLeading
