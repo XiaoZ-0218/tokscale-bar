@@ -52,8 +52,10 @@ struct PopoverView: View {
                     }
                     heroCard(report, snapshot: snapshot)
                     chartSection(snapshot)
-                    modelBreakdown(report)
-                    clientShare(report)
+                    if !report.entries.isEmpty {
+                        modelBreakdown(report)
+                        clientShare(report)
+                    }
                 } else if let error = model.lastError {
                     errorCard(error)
                 } else {

@@ -321,6 +321,7 @@ enum Format {
         let symbol = currency.symbol
         if amount >= 100 { return String(format: "%@%.0f", symbol, amount) }
         if amount >= 1 { return String(format: "%@%.2f", symbol, amount) }
+        if amount < 0.001 { return "\(symbol)0" } // a bare zero, not 0.000
         return String(format: "%@%.3f", symbol, amount)
     }
 
