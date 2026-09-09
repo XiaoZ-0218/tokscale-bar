@@ -88,11 +88,13 @@ struct ClientShareView: View {
             GeometryReader { geo in
                 HStack(spacing: 2) {
                     ForEach(Array(shares.enumerated()), id: \.offset) { index, share in
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        Rectangle()
                             .fill(Color.palette[index % Color.palette.count])
                             .frame(width: max(geo.size.width * share.cost / total - 2, 4))
                     }
                 }
+                // Segments are square; the capsule clip owns the outer shape.
+                .clipShape(Capsule())
             }
             .frame(height: 10)
 

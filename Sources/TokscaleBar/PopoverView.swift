@@ -284,37 +284,10 @@ struct PopoverView: View {
         return VStack(alignment: .leading, spacing: 8) {
             sectionTitle(l10n.topModels(top.count))
             VStack(spacing: 2) {
-                ForEach(Array(top.enumerated()), id: \.offset) { _, entry in
-                    HStack(spacing: 6) {
-                        Text(entry.model)
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                        Text(entry.client)
-                            .font(.system(size: 8, weight: .medium))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.brandDeep.opacity(0.12), in: Capsule())
-                            .foregroundStyle(Color.brandDeep)
-                        Spacer(minLength: 4)
-                        Text(Format.tokens(entry.tokens, settings.unitStyle))
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                            .monospacedDigit()
-                        Text(cost(entry.cost))
-                            .font(.system(size: 11, weight: .semibold))
-                            .monospacedDigit()
-                            .frame(minWidth: 54, alignment: .trailing)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .background {
-                        GeometryReader { geo in
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(Color.brandDeep.opacity(0.07))
-                                .frame(width: geo.size.width * entry.cost / maxCost)
-                        }
-                    }
+                ForEach(Array(top.enumerated()), id: \.offset) { index, entry in
+                    ModelRow(rank: index + 1, entry: entry, maxCost: maxCost,
+                             tokensText: Format.tokens(entry.tokens, settings.unitStyle),
+                             costText: cost(entry.cost))
                 }
             }
         }
@@ -418,6 +391,60 @@ struct PopoverView: View {
         // Use the formatter's Gregorian calendar, not Calendar.current, so a
         // non-Gregorian system calendar can't skew the weekday.
         return l10n.weekdayLetters[Self.dayFormatter.calendar.component(.weekday, from: d) - 1]
+    }
+}
+
+
+/// One ranked model row: proportional cost bar underneath, lifts on hover.
+private struct ModelRow: View {
+    let rank: Int
+    let entry: Report.Entry
+    let maxCost: Double
+    let tokensText: String
+    let costText: String
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text("\(rank)")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundStyle(.tertiary)
+                .frame(width: 12, alignment: .leading)
+            Text(entry.model)
+                .font(.system(size: 11, weight: .medium))
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Text(entry.client)
+                .font(.system(size: 8, weight: .semibold))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Color.brandDeep.opacity(0.12), in: Capsule())
+                .foregroundStyle(Color.brandDeep)
+            Spacer(minLength: 4)
+            Text(tokensText)
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .monospacedDigit()
+            Text(costText)
+                .font(.system(size: 11, weight: .semibold))
+                .monospacedDigit()
+                .frame(minWidth: 54, alignment: .trailing)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background {
+            GeometryReader { geo in
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.brandDeep.opacity(0.07))
+                    .frame(width: geo.size.width * entry.cost / maxCost)
+            }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(.primary.opacity(hovering ? 0.05 : 0))
+        }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .onHover { hovering = $0 }
     }
 }
 
