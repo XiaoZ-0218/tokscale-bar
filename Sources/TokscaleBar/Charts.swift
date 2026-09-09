@@ -25,9 +25,11 @@ struct BarChart: View {
     }
 
     private func style(for index: Int) -> AnyShapeStyle {
+        // Color is spent only on the highlighted bar; the rest stay neutral
+        // so the focal point reads instantly, heatmap-style.
         if index == highlight { return AnyShapeStyle(brandGradient) }
         return AnyShapeStyle(LinearGradient(
-            colors: [Color.brandDeep.opacity(0.3), Color.brandDeep.opacity(0.13)],
+            colors: [Color.primary.opacity(0.2), Color.primary.opacity(0.1)],
             startPoint: .top, endPoint: .bottom
         ))
     }

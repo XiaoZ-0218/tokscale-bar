@@ -33,15 +33,18 @@ let heroGradient = LinearGradient(
     startPoint: .topLeading, endPoint: .bottomTrailing
 )
 
-/// The standard content card: soft fill + hairline edge, one corner radius.
+/// The standard content card: a real surface (system control background)
+/// + hairline edge, one corner radius. Hand-tuned primary-opacity fills
+/// look muddy over the popover's vibrancy; semantic colors stay crisp.
 struct CardStyle: ViewModifier {
     var radius: CGFloat = 14
     func body(content: Content) -> some View {
         content
-            .background(.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .background(Color(nsColor: .controlBackgroundColor),
+                        in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.06), lineWidth: 0.5)
+                    .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
             }
     }
 }

@@ -113,57 +113,52 @@ struct PopoverView: View {
             HStack {
                 Text(l10n.heroTitle(period))
                     .font(.system(size: 11, weight: .semibold))
-                    .tracking(0.6)
-                    .foregroundStyle(.white.opacity(0.62))
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Text(heroDateLabel(snapshot))
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(cost(report.totalCost))
-                    .font(.system(size: 38, weight: .heavy, design: .rounded))
+                    .font(.system(size: 34, weight: .heavy, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(.white)
                 if period == .today, let delta = dayOverDay(snapshot.weekDays) {
-                    Label(deltaText(delta), systemImage: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
-                        .font(.system(size: 10, weight: .bold))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(.white.opacity(0.18), in: Capsule())
-                        .help(l10n.vsYesterday)
+                    deltaBadge(delta)
                 }
             }
-            HStack(spacing: 8) {
-                heroStat(icon: "number", text: l10n.tokensPill(Format.tokens(report.totalTokens, settings.unitStyle)))
-                heroStat(icon: "bubble.left.and.bubble.right", text: l10n.messagesPill(report.totalMessages))
+            Rectangle().fill(.primary.opacity(0.06)).frame(height: 1)
+            HStack {
+                miniStat(icon: "number",
+                         text: l10n.tokensPill(Format.tokens(report.totalTokens, settings.unitStyle)))
+                Spacer()
+                miniStat(icon: "bubble.left.and.bubble.right",
+                         text: l10n.messagesPill(report.totalMessages))
             }
         }
-        .padding(16)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 16, style: .continuous).fill(heroGradient)
-                // Soft light bleeding in from the top edge gives the flat
-                // gradient a light source — the cheapest "depth" there is.
-                RadialGradient(colors: [.white.opacity(0.22), .clear],
-                               center: .topLeading, startRadius: 0, endRadius: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 96, weight: .black))
-                    .foregroundStyle(.white.opacity(0.05))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .offset(x: 10, y: 14)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(.white.opacity(0.14), lineWidth: 0.5)
-        }
-        .shadow(color: Color.brandInk.opacity(0.45), radius: 10, y: 5)
+        .card()
+    }
+
+    /// Spending trend semantics: less than yesterday is green, more is orange.
+    private func deltaBadge(_ delta: Double) -> some View {
+        let tint: Color = delta >= 0 ? .orange : .green
+        return Label(deltaText(delta), systemImage: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
+            .font(.system(size: 10, weight: .bold))
+            .monospacedDigit()
+            .foregroundStyle(tint)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(tint.opacity(0.12), in: Capsule())
+            .help(l10n.vsYesterday)
+    }
+
+    private func miniStat(icon: String, text: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.system(size: 11, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
     }
 
     private func heroDateLabel(_ snapshot: Snapshot) -> String {
@@ -191,17 +186,6 @@ struct PopoverView: View {
         guard let date, date.count >= 10 else { return "?" }
         let ymd = String(date.prefix(10))
         return settings.language == .zh ? ymd.replacingOccurrences(of: "-", with: "/") : ymd
-    }
-
-    private func heroStat(icon: String, text: String) -> some View {
-        Label(text, systemImage: icon)
-            .font(.system(size: 10, weight: .semibold))
-            .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.92))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(.white.opacity(0.13), in: Capsule())
-            .overlay { Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 0.5) }
     }
 
     // MARK: Chart
@@ -425,9 +409,8 @@ struct PopoverView: View {
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .tracking(0.5)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.primary.opacity(0.85))
     }
 
     /// Percent change of today vs. yesterday, nil when yesterday had no spend.
@@ -488,8 +471,8 @@ private struct ModelRow: View {
                 .font(.system(size: 8, weight: .semibold))
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .background(Color.brandDeep.opacity(0.12), in: Capsule())
-                .foregroundStyle(Color.brandDeep)
+                .background(.secondary.opacity(0.12), in: Capsule())
+                .foregroundStyle(.secondary)
             Spacer(minLength: 4)
             Text(tokensText)
                 .font(.system(size: 10))
@@ -505,7 +488,7 @@ private struct ModelRow: View {
         .background {
             GeometryReader { geo in
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.brandDeep.opacity(0.07))
+                    .fill(Color.primary.opacity(0.05))
                     .frame(width: geo.size.width * entry.cost / maxCost)
             }
         }
