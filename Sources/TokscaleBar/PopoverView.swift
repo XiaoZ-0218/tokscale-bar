@@ -106,29 +106,30 @@ struct PopoverView: View {
     // MARK: Hero
 
     private func heroCard(_ report: Report, snapshot: Snapshot) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l10n.heroTitle(period))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.75))
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(.white.opacity(0.62))
                 Spacer()
                 Text(heroDateLabel(snapshot))
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(cost(report.totalCost))
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .font(.system(size: 38, weight: .heavy, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(.white)
                 if period == .today, let delta = dayOverDay(snapshot.weekDays) {
                     Label(deltaText(delta), systemImage: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 10, weight: .bold))
                         .monospacedDigit()
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(.white)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
-                        .background(.white.opacity(0.16), in: Capsule())
+                        .background(.white.opacity(0.18), in: Capsule())
                         .help(l10n.vsYesterday)
                 }
             }
@@ -137,10 +138,29 @@ struct PopoverView: View {
                 heroStat(icon: "bubble.left.and.bubble.right", text: l10n.messagesPill(report.totalMessages))
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(brandGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .shadow(color: Color.brandDeep.opacity(0.35), radius: 8, y: 4)
+        .background {
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 16, style: .continuous).fill(heroGradient)
+                // Soft light bleeding in from the top edge gives the flat
+                // gradient a light source — the cheapest "depth" there is.
+                RadialGradient(colors: [.white.opacity(0.22), .clear],
+                               center: .topLeading, startRadius: 0, endRadius: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 96, weight: .black))
+                    .foregroundStyle(.white.opacity(0.05))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .offset(x: 10, y: 14)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.white.opacity(0.14), lineWidth: 0.5)
+        }
+        .shadow(color: Color.brandInk.opacity(0.45), radius: 10, y: 5)
     }
 
     private func heroDateLabel(_ snapshot: Snapshot) -> String {
@@ -163,12 +183,13 @@ struct PopoverView: View {
 
     private func heroStat(icon: String, text: String) -> some View {
         Label(text, systemImage: icon)
-            .font(.system(size: 10, weight: .medium))
+            .font(.system(size: 10, weight: .semibold))
             .monospacedDigit()
-            .foregroundStyle(.white.opacity(0.9))
-            .padding(.horizontal, 8)
+            .foregroundStyle(.white.opacity(0.92))
+            .padding(.horizontal, 9)
             .padding(.vertical, 4)
-            .background(.white.opacity(0.16), in: Capsule())
+            .background(.white.opacity(0.13), in: Capsule())
+            .overlay { Capsule().strokeBorder(.white.opacity(0.12), lineWidth: 0.5) }
     }
 
     // MARK: Chart
