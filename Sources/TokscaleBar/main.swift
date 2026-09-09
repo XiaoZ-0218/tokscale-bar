@@ -272,7 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func togglePopover() {
-        guard let button = statusItem.button else { return }
+        guard statusItem.button != nil else { return }
         if NSApp.currentEvent?.type == .rightMouseUp {
             showStatusMenu()
             return
