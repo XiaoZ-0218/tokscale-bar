@@ -47,8 +47,10 @@ For development, `swift run` runs it in the foreground. Releases are built by Gi
 
 ### Debug flags
 
-- `--preview-window` — show the popover content in a regular window
-- `--render-png <path> [--period today|week|month] [--lang zh|en] [--units western|chinese] [--currency usd|cny]` — render the dashboard offscreen to a PNG (used to generate the screenshots above)
+- `--preview-window` — show the popover content in a regular window; honors the appearance/state flags below
+- `--render-png <path> [flags]` — render offscreen to a PNG (used to generate the screenshots above)
+- Appearance flags: `--period today|week|month`, `--lang zh|en`, `--units western|chinese`, `--currency usd|cny`
+- State flags: `--mock` (deterministic fake data, no tokscale needed) and `--state empty|error|settings` — e.g. `--render-png shot.png --mock --state settings` for fast UI iteration without touching real data
 
 ### How it works
 
@@ -97,8 +99,10 @@ open TokscaleBar.app  # 启动（无 Dock 图标，只看菜单栏）
 
 ### 调试参数
 
-- `--preview-window` — 把弹窗内容显示在普通窗口里，方便预览
-- `--render-png <路径> [--period today|week|month] [--lang zh|en] [--units western|chinese] [--currency usd|cny]` — 离屏渲染仪表盘为 PNG（README 截图就是这样生成的）
+- `--preview-window` — 把弹窗内容显示在普通窗口里，同样支持下面的外观/状态参数
+- `--render-png <路径> [参数]` — 离屏渲染为 PNG（README 截图就是这样生成的）
+- 外观参数：`--period today|week|month`、`--lang zh|en`、`--units western|chinese`、`--currency usd|cny`
+- 状态参数：`--mock`（确定性假数据，无需 tokscale）和 `--state empty|error|settings`——例如 `--render-png shot.png --mock --state settings`，不碰真实数据就能快速迭代 UI
 
 ### 文件结构
 
@@ -114,6 +118,7 @@ Sources/TokscaleBar/
 ├── Theme.swift                   设计令牌：品牌色、渐变、卡片样式
 ├── L10n.swift                    中英双语文案与语言/单位/货币枚举
 ├── Charts.swift                  柱状图、面积图、客户端占比组件
+├── Mock.swift                    调试用的确定性假数据（--mock / --state）
 └── PopoverView.swift             仪表盘（时段页签）与设置界面
 ```
 
