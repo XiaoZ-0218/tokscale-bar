@@ -1,4 +1,12 @@
+import AppKit
 import SwiftUI
+
+/// Tallest popover height that still fits the screen: visibleFrame already
+/// excludes the menu bar; the rest is the popover arrow plus breathing room.
+/// Anything shorter shows in full — a hardcoded cap clipped real content.
+private func maxPopoverHeight() -> CGFloat {
+    (NSScreen.main?.visibleFrame.height ?? 740) - 44
+}
 
 enum Period: String, CaseIterable, Identifiable {
     case today, week, last30, all
@@ -37,8 +45,8 @@ struct PopoverView: View {
     // MARK: - Dashboard
 
     private var dashboard: some View {
-        // Content grows with period/model counts; scroll past 620pt instead of
-        // letting the popover overflow the screen.
+        // Content grows with period/model counts; it scrolls only when it
+        // would overflow the screen, never at a hardcoded height.
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 header
@@ -67,7 +75,7 @@ struct PopoverView: View {
             .padding(14)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxHeight: 620)
+        .frame(maxHeight: maxPopoverHeight())
         .scrollIndicators(.automatic)
     }
 
@@ -520,7 +528,7 @@ struct SettingsView: View {
                 .padding(14)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxHeight: 620)
+        .frame(maxHeight: maxPopoverHeight())
     }
 
     private var content: some View {
