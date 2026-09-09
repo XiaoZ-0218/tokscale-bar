@@ -65,9 +65,11 @@ struct Snapshot {
     let today: Report
     let week: Report
     let last30: Report
+    let all: Report
     let hours: [HourUsage]      // always 24 entries, zero-filled
     let weekDays: [DayUsage]    // 7 entries ending today, zero-filled
     let last30Days: [DayUsage]  // 30 entries ending today, zero-filled
+    let allDays: [DayUsage]     // full history from `graph`, deduped and ascending
 }
 
 // MARK: - Service
@@ -204,7 +206,7 @@ final class TokscaleService {
     }
 
     private enum Job: Int, CaseIterable {
-        case today, week, last30, hourly, graph
+        case today, week, last30, all, hourly, graph
 
         var arguments: [String] {
             switch self {
@@ -213,6 +215,8 @@ final class TokscaleService {
             // tokscale has no "last N days" shortcut; --since/--until are inclusive.
             case .last30: return ["--json", "--since", TokscaleService.dayString(daysAgo: 29),
                                   "--until", TokscaleService.dayString(daysAgo: 0), "--no-spinner"]
+            // No date flags: tokscale reports its full history.
+            case .all: return ["--json", "--no-spinner"]
             case .hourly: return ["hourly", "--json", "--today", "--no-spinner"]
             case .graph: return ["graph", "--no-spinner"]
             }
@@ -239,8 +243,8 @@ final class TokscaleService {
         }
         group.wait()
         guard let todayData = outputs[.today], let weekData = outputs[.week],
-              let last30Data = outputs[.last30], let hourlyData = outputs[.hourly],
-              let graphData = outputs[.graph] else {
+              let last30Data = outputs[.last30], let allData = outputs[.all],
+              let hourlyData = outputs[.hourly], let graphData = outputs[.graph] else {
             throw firstError ?? TokscaleError.failed("unknown")
         }
 
@@ -251,9 +255,11 @@ final class TokscaleService {
             today: try decoder.decode(Report.self, from: todayData),
             week: try decoder.decode(Report.self, from: weekData),
             last30: try decoder.decode(Report.self, from: last30Data),
+            all: try decoder.decode(Report.self, from: allData),
             hours: Self.padHours(hourly),
             weekDays: Self.padDays(graph.contributions, count: 7),
-            last30Days: Self.padDays(graph.contributions, count: 30)
+            last30Days: Self.padDays(graph.contributions, count: 30),
+            allDays: Self.dedupedDays(graph.contributions)
         )
     }
 
@@ -295,6 +301,23 @@ final class TokscaleService {
     /// YYYY-MM-DD of `daysAgo` days before today, in the local time zone.
     private static func dayString(daysAgo: Int) -> String {
         dayFormatter.string(from: calendar.date(byAdding: .day, value: -daysAgo, to: Date())!)
+    }
+
+/// Full history, last write per date wins, ascending by date.
+    static func dedupedDays(_ days: [DayUsage]) -> [DayUsage] {
+        Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
+            .values
+            .sorted { $0.date < $1.date }
+    }
+
+    /// Per-calendar-month cost totals, ascending. yyyy-MM keys sort lexically,
+    /// which is also chronological.
+    static func monthlyCosts(_ days: [DayUsage]) -> [(month: String, cost: Double)] {
+        var byMonth: [String: Double] = [:]
+        for day in days {
+            byMonth[String(day.date.prefix(7)), default: 0] += day.totals.cost
+        }
+        return byMonth.sorted { $0.key < $1.key }.map { (month: $0.key, cost: $0.value) }
     }
 
     /// `count` days ending `now`, zero-filled. `now` is injectable for tests.

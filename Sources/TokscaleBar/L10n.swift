@@ -38,6 +38,7 @@ struct L10n {
         case .today: return zh ? "今天" : "Today"
         case .week: return zh ? "近 7 天" : "7 Days"
         case .last30: return zh ? "近 30 天" : "30 Days"
+        case .all: return zh ? "全部" : "All"
         }
     }
 
@@ -46,6 +47,7 @@ struct L10n {
         case .today: return zh ? "今日花费" : "Today's Spend"
         case .week: return zh ? "近 7 天花费" : "Last 7 Days"
         case .last30: return zh ? "近 30 天花费" : "Last 30 Days"
+        case .all: return zh ? "全部花费" : "All Time"
         }
     }
 
@@ -68,6 +70,15 @@ struct L10n {
     var hourlyChart: String { zh ? "分时段" : "Hourly" }
     var noUsageYet: String { zh ? "还没有用量" : "No usage yet" }
     var dailyChart: String { zh ? "每日花费" : "Daily Spend" }
+    var monthlyChart: String { zh ? "每月花费" : "Monthly Spend" }
+
+    /// "2026-09" -> "9月" / "Sep"
+    func monthLabel(_ yyyyMM: String) -> String {
+        guard let month = Int(yyyyMM.suffix(2)), (1...12).contains(month) else { return yyyyMM }
+        if zh { return "\(month)月" }
+        return ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month - 1]
+    }
 
     func hourLabel(_ hour: Int) -> String {
         zh ? "\(hour)时" : "\(hour):00"

@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Period: String, CaseIterable, Identifiable {
-    case today, week, last30
+    case today, week, last30, all
     var id: String { rawValue }
 }
 
@@ -77,6 +77,7 @@ struct PopoverView: View {
         case .today: return snapshot.today
         case .week: return snapshot.week
         case .last30: return snapshot.last30
+        case .all: return snapshot.all
         }
     }
 
@@ -174,6 +175,8 @@ struct PopoverView: View {
             return "\(shortDate(snapshot.weekDays.first?.date)) – \(shortDate(snapshot.weekDays.last?.date))"
         case .last30:
             return "\(shortDate(snapshot.last30Days.first?.date)) – \(shortDate(snapshot.last30Days.last?.date))"
+        case .all:
+            return "\(fullDate(snapshot.allDays.first?.date)) – \(fullDate(snapshot.allDays.last?.date))"
         }
     }
 
@@ -181,6 +184,13 @@ struct PopoverView: View {
         guard let date, date.count >= 10 else { return "" }
         let md = String(date.suffix(5))
         return settings.language == .zh ? md.replacingOccurrences(of: "-", with: "/") : md
+    }
+
+    /// All-time ranges can span years, so keep the year: 2026/07/05.
+    private func fullDate(_ date: String?) -> String {
+        guard let date, date.count >= 10 else { return "?" }
+        let ymd = String(date.prefix(10))
+        return settings.language == .zh ? ymd.replacingOccurrences(of: "-", with: "/") : ymd
     }
 
     private func heroStat(icon: String, text: String) -> some View {
@@ -199,16 +209,25 @@ struct PopoverView: View {
     private func chartSection(_ snapshot: Snapshot) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                sectionTitle(period == .today ? l10n.hourlyChart : l10n.dailyChart)
+                let chartTitle = switch period {
+                case .today: l10n.hourlyChart
+                case .all: l10n.monthlyChart
+                default: l10n.dailyChart
+                }
+                sectionTitle(chartTitle)
                 Spacer()
                 Text(chartCaption(snapshot))
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
             }
+            // All-time is aggregated per calendar month — daily bars for
+            // years of history would be an unreadable comb.
+            let months = TokscaleService.monthlyCosts(snapshot.allDays)
             let values: [Double] = switch period {
             case .today: snapshot.hours.map(\.cost)
             case .week: snapshot.weekDays.map(\.totals.cost)
             case .last30: snapshot.last30Days.map(\.totals.cost)
+            case .all: months.map(\.cost)
             }
             if values.allSatisfy({ $0 <= 0 }) {
                 // Flat zero bars read as a rendering bug; say it's empty instead.
@@ -233,6 +252,11 @@ struct PopoverView: View {
                              highlight: values.count - 1,
                              maxBarHeight: 52)
                     last30Axis(snapshot.last30Days)
+                case .all:
+                    BarChart(values: values,
+                             highlight: values.count - 1,
+                             maxBarHeight: 52)
+                    allAxis(months.map(\.month))
                 }
             }
         }
@@ -249,6 +273,8 @@ struct PopoverView: View {
             return "\(shortDate(snapshot.weekDays.first?.date)) – \(shortDate(snapshot.weekDays.last?.date))"
         case .last30:
             return "\(shortDate(snapshot.last30Days.first?.date)) – \(shortDate(snapshot.last30Days.last?.date))"
+        case .all:
+            return "\(fullDate(snapshot.allDays.first?.date)) – \(fullDate(snapshot.allDays.last?.date))"
         }
     }
 
@@ -269,6 +295,20 @@ struct PopoverView: View {
                 Text(weekdayLetter(day.date))
                     .font(.system(size: 8, weight: isToday(day.date) ? .bold : .regular))
                     .foregroundStyle(isToday(day.date) ? .primary : .tertiary)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    /// Month label under each all-time bar; thins out beyond a year of bars.
+    private func allAxis(_ months: [String]) -> some View {
+        let strideBy = max(months.count / 12, 1)
+        return HStack(spacing: 0) {
+            ForEach(Array(months.enumerated()), id: \.offset) { index, month in
+                Text(index % strideBy == 0 ? l10n.monthLabel(month) : "")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize()
                     .frame(maxWidth: .infinity)
             }
         }

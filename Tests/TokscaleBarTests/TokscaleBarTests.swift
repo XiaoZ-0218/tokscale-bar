@@ -112,6 +112,17 @@ final class PaddingTests: XCTestCase {
         XCTAssertEqual(days.last?.date, "2026-09-06")
     }
 
+    func testMonthlyCostsGroupsAndOrdersByMonth() {
+        let days = [
+            day("2026-08-31", cost: 1),
+            day("2026-07-01", cost: 2),
+            day("2026-08-01", cost: 4),
+        ]
+        let months = TokscaleService.monthlyCosts(days)
+        XCTAssertEqual(months.map(\.month), ["2026-07", "2026-08"])
+        XCTAssertEqual(months.map(\.cost), [2, 5])
+    }
+
     func testPadThirtyDaysToleratesDuplicateDates() {
         let today = Self.dayFormatter.string(from: fixedNow)
         let days = TokscaleService.padDays([day(today, cost: 1), day(today, cost: 2)], count: 30, now: fixedNow)

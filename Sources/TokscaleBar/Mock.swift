@@ -9,19 +9,22 @@ enum Mock {
             today: report(todayEntries),
             week: report(weekEntries),
             last30: report(last30Entries),
+            all: report(allEntries),
             hours: hourCurve,
             weekDays: pastDays(7, costs: [12.4, 28.1, 21.7, 35.2, 18.9, 41.5, 34.26]),
-            last30Days: pastDays(30, costs: (1...30).map { 6 + 30 * abs(sin(Double($0) * 0.9)) })
+            last30Days: pastDays(30, costs: (1...30).map { 6 + 30 * abs(sin(Double($0) * 0.9)) }),
+            allDays: pastDays(64, costs: (1...64).map { 4 + 28 * abs(sin(Double($0) * 0.7)) })
         )
     }
 
     /// All-zero snapshot: exercises the chart empty state and ¥0 hero.
     static var empty: Snapshot {
         Snapshot(
-            today: .empty, week: .empty, last30: .empty,
+            today: .empty, week: .empty, last30: .empty, all: .empty,
             hours: (0..<24).map { HourUsage(hour: $0, cost: 0) },
             weekDays: pastDays(7, costs: [0, 0, 0, 0, 0, 0, 0]),
-            last30Days: pastDays(30, costs: [Double](repeating: 0, count: 30))
+            last30Days: pastDays(30, costs: [Double](repeating: 0, count: 30)),
+            allDays: []
         )
     }
 
@@ -46,6 +49,10 @@ enum Mock {
 
     private static let last30Entries: [Report.Entry] = weekEntries.map {
         entry($0.client, $0.model, $0.tokens * 4, $0.cost * 4.2, $0.messageCount * 4)
+    }
+
+    private static let allEntries: [Report.Entry] = weekEntries.map {
+        entry($0.client, $0.model, $0.tokens * 9, $0.cost * 9.5, $0.messageCount * 9)
     }
 
     private static func entry(_ client: String, _ model: String, _ tokens: Int,
