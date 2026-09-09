@@ -119,6 +119,9 @@ struct DebugFlags {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
+    /// Closes the popover on clicks outside the app (e.g. the desktop), which
+    /// `.transient` behavior alone doesn't catch for accessory apps.
+    private var outsideClickMonitor: Any?
     private let model = AppModel()
     private var cancellable: Any?
     private var renderObservers: [AnyCancellable] = []
@@ -286,6 +289,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         guard let button = statusItem.button else { return }
         model.refresh()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        // Global monitors only see events in other apps; clicks inside this
+        // app (including the status item) are covered by .transient/toggle.
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown]
+        ) { [weak self] _ in
+            self?.popover.performClose(nil)
+        }
     }
 
     @objc private func openSettings() {
@@ -323,6 +333,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
+        if let monitor = outsideClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            outsideClickMonitor = nil
+        }
         // Always land back on the dashboard for the next open.
         model.showSettings = false
     }
