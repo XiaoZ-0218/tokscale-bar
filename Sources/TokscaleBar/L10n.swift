@@ -63,6 +63,7 @@ struct L10n {
 
     // Charts
     var hourlyChart: String { zh ? "分时段" : "Hourly" }
+    var noUsageYet: String { zh ? "还没有用量" : "No usage yet" }
     var dailyChart: String { zh ? "每日花费" : "Daily Spend" }
 
     func hourLabel(_ hour: Int) -> String {

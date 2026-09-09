@@ -203,31 +203,43 @@ struct PopoverView: View {
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
             }
-            switch period {
-            case .today:
-                BarChart(values: snapshot.hours.map(\.cost),
-                         highlight: Calendar.current.component(.hour, from: Date()),
-                         maxBarHeight: 52)
-                hourAxis
-            case .week:
-                BarChart(values: snapshot.weekDays.map(\.totals.cost),
-                         highlight: snapshot.weekDays.count - 1,
-                         maxBarHeight: 52)
-                weekAxis(snapshot.weekDays)
-            case .month:
-                let values = snapshot.monthDays.map(\.totals.cost)
-                if values.count <= 1 {
-                    // AreaChart needs at least two points; on the 1st of the
-                    // month show a single bar instead of a blank canvas.
-                    BarChart(values: values, highlight: 0, maxBarHeight: 52)
-                } else {
-                    AreaChart(values: values)
-                        .frame(height: 64)
+            let values: [Double] = switch period {
+            case .today: snapshot.hours.map(\.cost)
+            case .week: snapshot.weekDays.map(\.totals.cost)
+            case .month: snapshot.monthDays.map(\.totals.cost)
+            }
+            if values.allSatisfy({ $0 <= 0 }) {
+                // Flat zero bars read as a rendering bug; say it's empty instead.
+                Label(l10n.noUsageYet, systemImage: "chart.bar.xaxis")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, minHeight: 56)
+            } else {
+                switch period {
+                case .today:
+                    BarChart(values: values,
+                             highlight: Calendar.current.component(.hour, from: Date()),
+                             maxBarHeight: 52)
+                    hourAxis
+                case .week:
+                    BarChart(values: values,
+                             highlight: values.count - 1,
+                             maxBarHeight: 52)
+                    weekAxis(snapshot.weekDays)
+                case .month:
+                    if values.count <= 1 {
+                        // AreaChart needs at least two points; on the 1st of the
+                        // month show a single bar instead of a blank canvas.
+                        BarChart(values: values, highlight: 0, maxBarHeight: 52)
+                    } else {
+                        AreaChart(values: values)
+                            .frame(height: 64)
+                    }
                 }
             }
         }
         .padding(12)
-        .background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .card(radius: 12)
     }
 
     private func chartCaption(_ snapshot: Snapshot) -> String {

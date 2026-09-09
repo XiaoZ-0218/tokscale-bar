@@ -8,20 +8,26 @@ struct BarChart: View {
 
     var body: some View {
         let peak = max(values.max() ?? 0, 0.0001)
+        let corner: CGFloat = values.count > 12 ? 2.5 : 4
         HStack(alignment: .bottom, spacing: values.count > 12 ? 3 : 8) {
             ForEach(Array(values.enumerated()), id: \.offset) { index, value in
-                RoundedRectangle(cornerRadius: values.count > 12 ? 2 : 4, style: .continuous)
+                UnevenRoundedRectangle(topLeadingRadius: corner, bottomLeadingRadius: 1,
+                                       bottomTrailingRadius: 1, topTrailingRadius: corner,
+                                       style: .continuous)
                     .fill(style(for: index))
-                    .frame(height: 5 + maxBarHeight * max(value / peak, 0))
+                    .frame(height: 4 + maxBarHeight * max(value / peak, 0))
                     .frame(maxWidth: .infinity)
+                    .shadow(color: index == highlight ? Color.brand.opacity(0.5) : .clear,
+                            radius: 5, y: 1)
             }
         }
+        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: values)
     }
 
     private func style(for index: Int) -> AnyShapeStyle {
         if index == highlight { return AnyShapeStyle(brandGradient) }
         return AnyShapeStyle(LinearGradient(
-            colors: [Color.brandDeep.opacity(0.34), Color.brandDeep.opacity(0.16)],
+            colors: [Color.brandDeep.opacity(0.3), Color.brandDeep.opacity(0.13)],
             startPoint: .top, endPoint: .bottom
         ))
     }
@@ -58,6 +64,7 @@ struct AreaChart: View {
                 Gradient(colors: [Color.brand.opacity(0.35), Color.brand.opacity(0.02)]),
                 startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)
             ))
+            context.stroke(line, with: .color(.brand.opacity(0.22)), lineWidth: 5)
             context.stroke(line, with: .color(.brand), lineWidth: 1.5)
 
             if let last = points.last {
