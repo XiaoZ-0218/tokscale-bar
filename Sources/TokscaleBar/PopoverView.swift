@@ -372,15 +372,7 @@ struct PopoverView: View {
             }
             Spacer()
             Button(action: model.refresh) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 10, weight: .medium))
-                    .rotationEffect(.degrees(model.isRefreshing ? 360 : 0))
-                    .animation(
-                        model.isRefreshing
-                            ? .linear(duration: 0.9).repeatForever(autoreverses: false)
-                            : .default,
-                        value: model.isRefreshing
-                    )
+                RefreshGlyph(isRefreshing: model.isRefreshing)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
@@ -506,6 +498,42 @@ private struct ModelRow: View {
         }
         .animation(.easeOut(duration: 0.12), value: hovering)
         .onHover { hovering = $0 }
+    }
+}
+
+/// Spinning refresh glyph. The repeatForever animation must start through an
+/// explicit withAnimation on local @State: attaching it via
+/// .animation(_:value:) leaks the repeating transaction onto every layout
+/// change that shares the isRefreshing flip (e.g. the error card
+/// disappearing), and the button's position then replays forever — the glyph
+/// visibly flies across the popover and the runaway animation never stops.
+/// Stopping needs an animation-disabled transaction; a plain assignment
+/// leaves the repeating animation running invisibly.
+private struct RefreshGlyph: View {
+    let isRefreshing: Bool
+    @State private var spinning = false
+
+    var body: some View {
+        Image(systemName: "arrow.clockwise")
+            .font(.system(size: 10, weight: .medium))
+            .rotationEffect(.degrees(spinning ? 360 : 0))
+            .onAppear { if isRefreshing { startSpin() } }
+            .onChange(of: isRefreshing) { refreshing in
+                if refreshing {
+                    startSpin()
+                } else {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { spinning = false }
+                }
+            }
+    }
+
+    private func startSpin() {
+        spinning = false
+        withAnimation(.linear(duration: 0.9).repeatForever(autoreverses: false)) {
+            spinning = true
+        }
     }
 }
 
