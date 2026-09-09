@@ -173,9 +173,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover = NSPopover()
         popover.behavior = .transient
         popover.delegate = self
-        popover.contentViewController = NSHostingController(
+        // sizingOptions publishes SwiftUI's ideal size as preferredContentSize,
+        // which is the only channel NSPopover obeys — without it the popover
+        // falls back to its 320×320 default and no frame modifier can grow it.
+        let hosting = NSHostingController(
             rootView: PopoverView(model: model, settings: model.settings)
         )
+        hosting.sizingOptions = [.preferredContentSize]
+        popover.contentViewController = hosting
 
         let snapshotChanged = model.$snapshot.combineLatest(model.$lastError).map { _ in () }
         let metricChanged = model.settings.$menuMetric.map { _ in () }
