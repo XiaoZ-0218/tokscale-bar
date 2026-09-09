@@ -24,6 +24,7 @@ A lightweight macOS menu bar app that turns your local [tokscale](https://github
 - **Currencies**: USD `$` / CNY `¥` with a configurable exchange rate
 - **Number units**: Western `K/M/B` or Chinese `万/亿`
 - **Settings**: menu bar metric, refresh interval (1/5/15 min), launch at login, custom tokscale path
+- **Right-click the menu bar icon**: quick menu with Refresh / Settings / Quit
 
 ### Requirements
 
@@ -77,6 +78,7 @@ All data stays local.
 - **货币**：美元 `$` / 人民币 `¥`，汇率可自定义（默认 7.2）
 - **数字单位**：英制 `K/M/B` 或 中制 `万/亿`
 - **自定义设置**：菜单栏显示内容、刷新间隔（1/5/15 分钟）、登录时启动、tokscale 路径
+- **右键菜单栏图标**：快捷菜单（刷新 / 设置 / 退出）
 
 ### 下载
 
