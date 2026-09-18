@@ -11,8 +11,6 @@ extension Color {
 
     static let brand = Color(hex: 0x30D158)
     static let brandDeep = Color(hex: 0x0E9F6E)
-    /// Deep base of the hero gradient; reads as "forest", not "neon".
-    static let brandInk = Color(hex: 0x07362A)
 
     /// Distinct palette for per-client breakdowns.
     static let palette: [Color] = [
@@ -24,12 +22,6 @@ extension Color {
 
 let brandGradient = LinearGradient(
     colors: [Color.brand, Color.brandDeep],
-    startPoint: .topLeading, endPoint: .bottomTrailing
-)
-
-/// Hero gradient with real depth: dark ink base rising into brand green.
-let heroGradient = LinearGradient(
-    colors: [Color.brandDeep, Color.brandInk],
     startPoint: .topLeading, endPoint: .bottomTrailing
 )
 

@@ -106,6 +106,16 @@ final class TokscaleService {
         for path in ["/opt/homebrew/bin/tokscale", "/usr/local/bin/tokscale"] {
             if isExecutableBinary(path) { return path }
         }
+        // Neither Homebrew prefix hit — custom prefix, mise, etc. Fall back
+        // to a PATH scan (which-semantic) before giving up.
+        let pathEnv = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        for directory in pathEnv.split(separator: ":") {
+            // NSString, not String.appendingPathComponent: the
+            // UniformTypeIdentifiers overload shadows Foundation's on
+            // recent SDKs.
+            let candidate = (String(directory) as NSString).appendingPathComponent("tokscale")
+            if isExecutableBinary(candidate) { return candidate }
+        }
         throw TokscaleError.binaryNotFound
     }
 
@@ -145,27 +155,32 @@ final class TokscaleService {
 
         // Drain both pipes concurrently: a child that fills stderr's ~64KB
         // buffer would otherwise block forever while we wait on stdout.
-        // Writes go through a lock so there's no data race on the buffers.
+        // readabilityHandler (a dispatch source) instead of
+        // readDataToEndOfFile (a parked thread) so a hung child doesn't
+        // accumulate sleeping reader threads across repeated timed-out
+        // fetches; dropping the handler releases it. Writes go through a
+        // lock so there's no data race on the buffers.
         let bufferLock = NSLock()
         var outData = Data()
         var errData = Data()
         let reads = DispatchGroup()
-        reads.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            let data = stdout.fileHandleForReading.readDataToEndOfFile()
-            bufferLock.lock()
-            outData = data
-            bufferLock.unlock()
-            reads.leave()
+
+        func drain(_ handle: FileHandle, _ append: @escaping (Data) -> Void) {
+            reads.enter()
+            handle.readabilityHandler = { source in
+                let chunk = source.availableData
+                bufferLock.lock()
+                if chunk.isEmpty { // EOF
+                    source.readabilityHandler = nil
+                    reads.leave()
+                } else {
+                    append(chunk)
+                }
+                bufferLock.unlock()
+            }
         }
-        reads.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            let data = stderr.fileHandleForReading.readDataToEndOfFile()
-            bufferLock.lock()
-            errData = data
-            bufferLock.unlock()
-            reads.leave()
-        }
+        drain(stdout.fileHandleForReading) { outData.append($0) }
+        drain(stderr.fileHandleForReading) { errData.append($0) }
 
         if exited.wait(timeout: .now() + timeout) == .timedOut {
             if process.isRunning {
@@ -181,11 +196,13 @@ final class TokscaleService {
                     process.waitUntilExit() // settles terminationStatus
                 }
                 // A killed child can leave the pipes held open by a
-                // grandchild, so the drain wait must be bounded too. Don't
-                // close the read ends here: closing under a blocked
-                // readDataToEndOfFile can raise NSFileHandleOperationException
-                // on the reader thread and abort the process. Worst case is a
-                // couple of sleeping reader threads; the UI still recovers.
+                // grandchild; drop the handlers so the dispatch sources are
+                // released instead of waiting on an EOF that never comes.
+                // A handler invocation already in flight may still finish
+                // (it only touches lock-protected state), which the bounded
+                // wait below covers.
+                stdout.fileHandleForReading.readabilityHandler = nil
+                stderr.fileHandleForReading.readabilityHandler = nil
                 _ = reads.wait(timeout: .now() + 1)
                 throw TokscaleError.timedOut
             }
@@ -249,13 +266,13 @@ final class TokscaleService {
         }
 
         let decoder = JSONDecoder()
-        let graph = try decoder.decode(GraphPayload.self, from: graphData)
-        let hourly = try decoder.decode(HourlyPayload.self, from: hourlyData)
+        let graph = try Self.decode(GraphPayload.self, from: graphData, job: "graph", using: decoder)
+        let hourly = try Self.decode(HourlyPayload.self, from: hourlyData, job: "hourly", using: decoder)
         return Snapshot(
-            today: try decoder.decode(Report.self, from: todayData),
-            week: try decoder.decode(Report.self, from: weekData),
-            last30: try decoder.decode(Report.self, from: last30Data),
-            all: try decoder.decode(Report.self, from: allData),
+            today: try Self.decode(Report.self, from: todayData, job: "today", using: decoder),
+            week: try Self.decode(Report.self, from: weekData, job: "week", using: decoder),
+            last30: try Self.decode(Report.self, from: last30Data, job: "last30", using: decoder),
+            all: try Self.decode(Report.self, from: allData, job: "all", using: decoder),
             hours: Self.padHours(hourly),
             weekDays: Self.padDays(graph.contributions, count: 7),
             last30Days: Self.padDays(graph.contributions, count: 30),
@@ -263,47 +280,66 @@ final class TokscaleService {
         )
     }
 
+    /// Decode one job's payload, wrapping a DecodingError in TokscaleError.failed
+    /// with the job name and a compact summary so the error banner says which
+    /// query broke instead of a bare decoding failure.
+    private static func decode<T: Decodable>(_ type: T.Type, from data: Data,
+                                             job: String, using decoder: JSONDecoder) throws -> T {
+        do {
+            return try decoder.decode(type, from: data)
+        } catch let error as DecodingError {
+            throw TokscaleError.failed("tokscale '\(job)' output failed to decode: \(describe(error))")
+        }
+    }
+
+    private static func describe(_ error: DecodingError) -> String {
+        func path(_ context: DecodingError.Context) -> String {
+            let keys = context.codingPath.map { $0.stringValue }
+            return keys.isEmpty ? "<root>" : keys.joined(separator: ".")
+        }
+        switch error {
+        case .keyNotFound(let key, let context):
+            return "missing key '\(key.stringValue)' at \(path(context))"
+        case .typeMismatch(_, let context):
+            return "type mismatch at \(path(context)): \(context.debugDescription)"
+        case .valueNotFound(_, let context):
+            return "missing value at \(path(context))"
+        case .dataCorrupted(let context):
+            return "corrupt data at \(path(context)): \(context.debugDescription)"
+        @unknown default:
+            return String(describing: error)
+        }
+    }
+
     // MARK: - Zero-filling helpers
 
-    /// POSIX locale + Gregorian calendar so a user on a non-Gregorian
-    /// system calendar still parses tokscale's ISO dates correctly. Padding
-    /// keys follow the local time zone ("today" means the Mac's today);
-    /// autoupdating so a long-lived menu bar app survives timezone changes.
-    private static let calendar: Calendar = {
-        var c = Calendar(identifier: .gregorian)
-        c.locale = Locale(identifier: "en_US_POSIX")
-        c.timeZone = .autoupdatingCurrent
-        return c
-    }()
-
-    private static let dayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.calendar = calendar
-        f.timeZone = .autoupdatingCurrent
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
+    /// Padding keys come from `Dates` (POSIX + Gregorian), so a
+    /// non-Gregorian system calendar can't skew them and "today" means the
+    /// Mac's today.
+    private static var calendar: Calendar { Dates.calendar }
 
     /// All 24 hours of today, zero-filled.
     static func padHours(_ payload: HourlyPayload) -> [HourUsage] {
         var byHour: [Int: Double] = [:]
         for entry in payload.entries {
-            // "2026-09-06 09:00" — take the HH of the time component.
-            if let time = entry.hour.split(separator: " ").last,
-               let hour = Int(time.prefix(2)) {
-                byHour[hour, default: 0] += entry.cost
-            }
+            // "2026-09-06 09:00" (an ISO variant would use "T09:00") — split
+            // the time component on ":" and validate the range, so an
+            // unparseable hour is skipped instead of prefix(2) silently
+            // reading "20" out of a "T"-prefixed ISO timestamp.
+            guard let time = entry.hour.split(whereSeparator: { $0 == " " || $0 == "T" }).last,
+                  let hourText = time.split(separator: ":").first,
+                  let hour = Int(hourText), (0...23).contains(hour) else { continue }
+            byHour[hour, default: 0] += entry.cost
         }
         return (0..<24).map { HourUsage(hour: $0, cost: byHour[$0] ?? 0) }
     }
 
     /// YYYY-MM-DD of `daysAgo` days before today, in the local time zone.
     private static func dayString(daysAgo: Int) -> String {
-        dayFormatter.string(from: calendar.date(byAdding: .day, value: -daysAgo, to: Date())!)
+        Dates.dayString(calendar.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date())
     }
 
-/// Full history, last write per date wins, ascending by date.
+    /// Full history, last write per date wins, ascending by date.
     static func dedupedDays(_ days: [DayUsage]) -> [DayUsage] {
         Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
             .values
@@ -325,8 +361,8 @@ final class TokscaleService {
         // graph can repeat a date; uniqueKeysWithValues would trap.
         let byDate = Dictionary(days.map { ($0.date, $0) }, uniquingKeysWith: { _, last in last })
         return (0..<count).reversed().map { offset in
-            let date = calendar.date(byAdding: .day, value: -offset, to: now)!
-            let key = dayFormatter.string(from: date)
+            let date = calendar.date(byAdding: .day, value: -offset, to: now) ?? now
+            let key = Dates.dayString(date)
             return byDate[key] ?? DayUsage(date: key, totals: .init(tokens: 0, cost: 0, messages: 0))
         }
     }
@@ -338,9 +374,11 @@ enum Format {
     static func cost(_ value: Double, currency: AppCurrency = .usd, rate: Double = Defaults.usdToCnyRate) -> String {
         let amount = currency == .cny ? value * rate : value
         let symbol = currency.symbol
-        if amount >= 100 { return String(format: "%@%.0f", symbol, amount) }
-        if amount >= 1 { return String(format: "%@%.2f", symbol, amount) }
-        if amount < 0.001 { return "\(symbol)0" } // a bare zero, not 0.000
+        if amount <= 0 { return "\(symbol)0" } // a bare zero, not 0.000
+        // Tier by the value rounded at the current tier's precision, so a
+        // boundary like 99.996 renders as "$100" rather than "$100.00".
+        if amount >= 99.995 { return String(format: "%@%.0f", symbol, amount) }
+        if amount >= 0.995 { return String(format: "%@%.2f", symbol, amount) }
         return String(format: "%@%.3f", symbol, amount)
     }
 
@@ -352,22 +390,37 @@ enum Format {
     }
 
     static func compact(_ value: Double) -> String {
-        switch abs(value) {
-        case 1_000_000_000...: return String(format: "%.1fB", value / 1e9)
-        case 1_000_000...: return String(format: "%.1fM", value / 1e6)
-        case 1_000...: return String(format: "%.1fK", value / 1e3)
-        default: return String(format: "%.0f", value)
+        let magnitude = abs(value)
+        // Tier on the value rounded at the lower tier's display precision, so
+        // 999999.9 renders as "1.0M", not "1000.0K", and 999.6 as "1.0K".
+        // The plain tier shows no decimals, so its threshold is 999.5.
+        if magnitude >= 1_000_000_000 || magnitude >= 999_950_000 {
+            return String(format: "%.1fB", value / 1e9)
         }
+        if magnitude >= 1_000_000 || magnitude >= 999_950 {
+            return String(format: "%.1fM", value / 1e6)
+        }
+        if magnitude >= 1_000 || magnitude >= 999.5 {
+            return String(format: "%.1fK", value / 1e3)
+        }
+        return String(format: "%.0f", value)
     }
 
     /// 千 is dropped: "1.0千" reads unnaturally in Chinese, so anything
     /// below 1万 stays a plain number.
     static func compactChinese(_ value: Double) -> String {
-        switch abs(value) {
-        case 100_000_000...: return String(format: "%.1f亿", value / 1e8)
-        case 1_000_000...: return String(format: "%.0f万", value / 1e4)
-        case 10_000...: return String(format: "%.1f万", value / 1e4)
-        default: return String(format: "%.0f", value)
+        let magnitude = abs(value)
+        // Same rounded-tier rule as `compact`: 99999999.9 renders as "1.0亿",
+        // not "10000万" (the %.0f万 tier would round it up at 99_999_995).
+        if magnitude >= 100_000_000 || magnitude >= 99_999_995 {
+            return String(format: "%.1f亿", value / 1e8)
         }
+        if magnitude >= 1_000_000 {
+            return String(format: "%.0f万", value / 1e4)
+        }
+        if magnitude >= 10_000 {
+            return String(format: "%.1f万", value / 1e4)
+        }
+        return String(format: "%.0f", value)
     }
 }

@@ -26,23 +26,28 @@ final class Settings: ObservableObject {
     /// Set false to mutate settings in-memory only (used by --render-png previews).
     var persists = true
 
+    /// UserDefaults keys. Raw values are the on-disk format and must stay stable.
+    private enum Key: String {
+        case menuMetric, refreshInterval, tokscalePath, unitStyle, language, currency, usdToCnyRate
+    }
+
     @Published var menuMetric: MenuMetric {
-        didSet { guard persists else { return }; defaults.set(menuMetric.rawValue, forKey: "menuMetric") }
+        didSet { guard persists else { return }; defaults.set(menuMetric.rawValue, forKey: Key.menuMetric.rawValue) }
     }
     @Published var refreshInterval: RefreshInterval {
-        didSet { guard persists else { return }; defaults.set(refreshInterval.rawValue, forKey: "refreshInterval") }
+        didSet { guard persists else { return }; defaults.set(refreshInterval.rawValue, forKey: Key.refreshInterval.rawValue) }
     }
     @Published var tokscalePath: String {
-        didSet { guard persists else { return }; defaults.set(tokscalePath, forKey: "tokscalePath") }
+        didSet { guard persists else { return }; defaults.set(tokscalePath, forKey: Key.tokscalePath.rawValue) }
     }
     @Published var unitStyle: UnitStyle {
-        didSet { guard persists else { return }; defaults.set(unitStyle.rawValue, forKey: "unitStyle") }
+        didSet { guard persists else { return }; defaults.set(unitStyle.rawValue, forKey: Key.unitStyle.rawValue) }
     }
     @Published var language: AppLanguage {
-        didSet { guard persists else { return }; defaults.set(language.rawValue, forKey: "language") }
+        didSet { guard persists else { return }; defaults.set(language.rawValue, forKey: Key.language.rawValue) }
     }
     @Published var currency: AppCurrency {
-        didSet { guard persists else { return }; defaults.set(currency.rawValue, forKey: "currency") }
+        didSet { guard persists else { return }; defaults.set(currency.rawValue, forKey: Key.currency.rawValue) }
     }
     @Published var usdToCnyRate: Double {
         didSet {
@@ -62,7 +67,7 @@ final class Settings: ObservableObject {
                 return
             }
             guard persists else { return }
-            defaults.set(usdToCnyRate, forKey: "usdToCnyRate")
+            defaults.set(usdToCnyRate, forKey: Key.usdToCnyRate.rawValue)
         }
     }
 
@@ -86,19 +91,28 @@ final class Settings: ObservableObject {
     var l10n: L10n { L10n(language: language) }
 
     init() {
-        menuMetric = MenuMetric(rawValue: defaults.string(forKey: "menuMetric") ?? "") ?? .cost
-        let interval = defaults.double(forKey: "refreshInterval")
+        menuMetric = MenuMetric(rawValue: defaults.string(forKey: Key.menuMetric.rawValue) ?? "") ?? .cost
+        let interval = defaults.double(forKey: Key.refreshInterval.rawValue)
         refreshInterval = RefreshInterval(rawValue: interval) ?? .fiveMinutes
-        tokscalePath = defaults.string(forKey: "tokscalePath") ?? ""
-        let savedLanguage = AppLanguage(rawValue: defaults.string(forKey: "language") ?? "") ?? .systemDefault
+        tokscalePath = defaults.string(forKey: Key.tokscalePath.rawValue) ?? ""
+        let savedLanguage = AppLanguage(rawValue: defaults.string(forKey: Key.language.rawValue) ?? "") ?? .systemDefault
         language = savedLanguage
         // zh defaults to 万/亿 units, en to K/M/B; an explicit saved choice wins.
-        unitStyle = UnitStyle(rawValue: defaults.string(forKey: "unitStyle") ?? "")
-            ?? (savedLanguage == .zh ? .chinese : .western)
-        let savedCurrency = AppCurrency(rawValue: defaults.string(forKey: "currency") ?? "")
-        currency = savedCurrency ?? (savedLanguage == .zh ? .cny : .usd)
-        let rate = defaults.double(forKey: "usdToCnyRate")
-        usdToCnyRate = rate > 0 ? Self.clampRate(rate) : Defaults.usdToCnyRate
+        unitStyle = UnitStyle(rawValue: defaults.string(forKey: Key.unitStyle.rawValue) ?? "")
+            ?? (savedLanguage.resolved == .zh ? .chinese : .western)
+        let savedCurrency = AppCurrency(rawValue: defaults.string(forKey: Key.currency.rawValue) ?? "")
+        currency = savedCurrency ?? (savedLanguage.resolved == .zh ? .cny : .usd)
+        let rate = defaults.double(forKey: Key.usdToCnyRate.rawValue)
+        let initialRate = rate > 0 ? Self.clampRate(rate) : Defaults.usdToCnyRate
+        usdToCnyRate = initialRate
+        // Property observers don't fire during init, so persist a corrected
+        // rate once here; otherwise a stale out-of-range value on disk would
+        // be offered back to the user on the next launch. Read the clamped
+        // value from the local, not self — stored properties aren't all
+        // initialized until launchAtLogin is set below.
+        if persists, initialRate != rate {
+            defaults.set(initialRate, forKey: Key.usdToCnyRate.rawValue)
+        }
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
@@ -112,6 +126,14 @@ final class Settings: ObservableObject {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
+            // A stale registration makes register() throw; clear it and retry
+            // once before giving up on the toggle. Don't sniff error codes —
+            // SMAppService's thrown codes don't reliably match the documented
+            // kSMError* values across macOS versions.
+            if launchAtLogin {
+                try? SMAppService.mainApp.unregister()
+                if (try? SMAppService.mainApp.register()) != nil { return }
+            }
             // Unsigned/dev bundles may fail; revert toggle to reflect reality.
             // Skip the write when already in sync so didSet doesn't fire again.
             let enabled = SMAppService.mainApp.status == .enabled

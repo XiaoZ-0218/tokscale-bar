@@ -1,10 +1,19 @@
 import Foundation
 
 enum AppLanguage: String, CaseIterable, Identifiable {
-    case zh, en
+    case zh, en, system
     var id: String { rawValue }
-    var label: String { self == .zh ? "中文" : "English" }
-    var locale: Locale { Locale(identifier: self == .zh ? "zh_CN" : "en_US") }
+    var label: String {
+        switch self {
+        case .zh: return "中文"
+        case .en: return "English"
+        case .system: return "跟随系统 / System"
+        }
+    }
+    var locale: Locale { Locale(identifier: resolved == .zh ? "zh_CN" : "en_US") }
+
+    /// The concrete language behind a choice; `.system` follows the OS.
+    var resolved: AppLanguage { self == .system ? .systemDefault : self }
 
     /// System default: Chinese when the preferred language is Chinese.
     static var systemDefault: AppLanguage {
@@ -15,7 +24,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 enum UnitStyle: String, CaseIterable, Identifiable {
     case western, chinese // K/M/B vs 万/亿
     var id: String { rawValue }
-    var label: String { self == .western ? "K / M" : "万 / 亿" }
+    var label: String { self == .western ? "K / M / B" : "万 / 亿" }
 }
 
 enum AppCurrency: String, CaseIterable, Identifiable {
@@ -28,7 +37,7 @@ enum AppCurrency: String, CaseIterable, Identifiable {
 /// All user-visible strings, keyed off the selected in-app language.
 struct L10n {
     let language: AppLanguage
-    private var zh: Bool { language == .zh }
+    private var zh: Bool { language.resolved == .zh }
 
     var locale: Locale { language.locale }
 
@@ -52,7 +61,8 @@ struct L10n {
     }
 
     func messagesPill(_ count: Int) -> String {
-        zh ? "\(count) 条消息" : "\(count) messages"
+        if zh { return "\(count) 条消息" }
+        return count == 1 ? "1 message" : "\(count) messages"
     }
 
     /// "tokens" stays untranslated in zh — it's the industry term.
@@ -90,13 +100,15 @@ struct L10n {
 
     // Breakdowns
     func topModels(_ count: Int) -> String {
-        zh ? "模型 TOP \(count)" : "TOP \(count) MODELS"
+        if zh { return "模型 TOP \(count)" }
+        return count == 1 ? "TOP 1 MODEL" : "TOP \(count) MODELS"
     }
     var byClient: String { zh ? "客户端占比" : "BY CLIENT" }
     var other: String { zh ? "其他" : "Other" }
 
     // Settings
     var settingsTitle: String { zh ? "设置" : "Settings" }
+    var back: String { zh ? "返回" : "Back" }
     var menuBarShows: String { zh ? "菜单栏显示" : "Menu Bar Shows" }
     var refreshEvery: String { zh ? "刷新间隔" : "Refresh Every" }
     var launchAtLogin: String { zh ? "登录时启动" : "Launch at Login" }

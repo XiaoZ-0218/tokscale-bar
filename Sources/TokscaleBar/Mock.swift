@@ -31,7 +31,7 @@ enum Mock {
     // MARK: Entries
 
     private static let todayEntries: [Report.Entry] = [
-        entry("zcode", "claude-opus-4.6", 26_700_000, 12.77, 812),
+        entry("zcode", "claude-opus-4.6", 26_700_000, 12.77, 812, reasoning: 1_300_000),
         entry("grok", "grok-4.6", 7_700_000, 10.25, 640),
         entry("zcode", "grok-4.6", 9_000_000, 6.42, 431),
         entry("zcode", "glm-5.3-flash", 170_600_000, 3.43, 355),
@@ -39,7 +39,7 @@ enum Mock {
     ]
 
     private static let weekEntries: [Report.Entry] = [
-        entry("zcode", "claude-opus-4.6", 152_000_000, 71.30, 4_102),
+        entry("zcode", "claude-opus-4.6", 152_000_000, 71.30, 4_102, reasoning: 7_400_000),
         entry("grok", "grok-4.6", 48_000_000, 63.80, 3_980),
         entry("zcode", "grok-4.6", 61_000_000, 43.12, 2_714),
         entry("zcode", "glm-5.3-flash", 980_000_000, 19.66, 2_201),
@@ -55,13 +55,16 @@ enum Mock {
         entry($0.client, $0.model, $0.tokens * 9, $0.cost * 9.5, $0.messageCount * 9)
     }
 
+    /// Reasoning tokens count toward `tokens`, so a non-nil value comes out
+    /// of the cacheRead share to keep the sections summing to `tokens`.
     private static func entry(_ client: String, _ model: String, _ tokens: Int,
-                              _ cost: Double, _ messages: Int) -> Report.Entry {
+                              _ cost: Double, _ messages: Int,
+                              reasoning: Int? = nil) -> Report.Entry {
         Report.Entry(
             client: client, model: model,
             input: tokens * 3 / 10, output: tokens / 10,
-            cacheRead: tokens * 6 / 10, cacheWrite: 0,
-            reasoning: nil, cost: cost, messageCount: messages
+            cacheRead: tokens * 6 / 10 - (reasoning ?? 0), cacheWrite: 0,
+            reasoning: reasoning, cost: cost, messageCount: messages
         )
     }
 
@@ -87,20 +90,13 @@ enum Mock {
     }()
 
     private static func pastDays(_ count: Int, costs: [Double]) -> [DayUsage] {
-        (0..<count).map { i in
-            DayUsage(
-                date: dayString(Calendar.current.date(byAdding: .day, value: i - count + 1, to: Date())!),
-                totals: DayUsage.Totals(tokens: 0, cost: costs[i], messages: 0)
+        assert(costs.count == count, "pastDays(\(count)) got \(costs.count) costs")
+        return zip(0..<count, costs).map { i, cost in
+            let date = Dates.calendar.date(byAdding: .day, value: i - count + 1, to: Date())!
+            return DayUsage(
+                date: Dates.dayString(date),
+                totals: DayUsage.Totals(tokens: 0, cost: cost, messages: 0)
             )
         }
     }
-
-    private static let dayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
-
-    private static func dayString(_ date: Date) -> String { dayFormatter.string(from: date) }
 }

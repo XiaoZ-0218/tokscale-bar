@@ -5,7 +5,9 @@ import SwiftUI
 /// Holds the fetched snapshot and drives refreshes on a timer.
 final class AppModel: ObservableObject {
     @Published var snapshot: Snapshot?
-    @Published var lastError: String?
+    /// The thrown error, not a localized string, so the banner re-localizes
+    /// when the language setting changes.
+    @Published var lastError: TokscaleError?
     @Published var lastUpdated: Date?
     @Published var isRefreshing = false
     /// Whether the popover shows the settings page. Reset when the popover closes.
@@ -38,6 +40,10 @@ final class AppModel: ObservableObject {
         )
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
     @objc private func settingsChanged() {
         service.binaryPath = settings.tokscalePath
         startTimer()
@@ -48,9 +54,13 @@ final class AppModel: ObservableObject {
         guard interval != currentInterval else { return }
         currentInterval = interval
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        // .common keeps the timer firing while a menu is tracking; the
+        // default mode freezes it for the whole interaction.
+        let newTimer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             self?.refresh()
         }
+        RunLoop.main.add(newTimer, forMode: .common)
+        timer = newTimer
     }
 
     func refresh() {
@@ -74,7 +84,9 @@ final class AppModel: ObservableObject {
             } catch {
                 DispatchQueue.main.async {
                     guard self.fetchesLiveData else { return }
-                    self.lastError = self.settings.l10n.errorText(error)
+                    // Non-tokscale errors (e.g. JSON decoding) keep their
+                    // message via .failed; see L10n.errorText.
+                    self.lastError = error as? TokscaleError ?? .failed(error.localizedDescription)
                 }
             }
         }
@@ -86,7 +98,7 @@ final class AppModel: ObservableObject {
         switch settings.menuMetric {
         case .cost: return Format.cost(snapshot.today.totalCost, currency: settings.currency, rate: settings.usdToCnyRate)
         case .tokens: return Format.tokens(snapshot.today.totalTokens, settings.unitStyle)
-        case .messages: return "\(snapshot.today.totalMessages)"
+        case .messages: return Format.tokens(snapshot.today.totalMessages, settings.unitStyle)
         }
     }
 }
@@ -119,22 +131,31 @@ struct DebugFlags {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
+    /// Strong reference keeping the `--preview-window` debug window alive
+    /// after the launch handler returns.
+    private var previewWindow: NSWindow?
     /// Closes the popover on clicks outside the app (e.g. the desktop), which
     /// `.transient` behavior alone doesn't catch for accessory apps.
     private var outsideClickMonitor: Any?
     private let model = AppModel()
-    private var cancellable: Any?
+    private var cancellable: AnyCancellable?
     private var renderObservers: [AnyCancellable] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Debug: `--render-png` renders the dashboard offscreen and exits, so
         // it must never touch the status bar.
         if let idx = CommandLine.arguments.firstIndex(of: "--render-png") {
+            let usage = "usage: --render-png <path> [--period today|week|last30|all] [--lang system|zh|en] [--units western|chinese] [--currency usd|cny] [--mock] [--state live|empty|error|settings]\n"
             guard CommandLine.arguments.indices.contains(idx + 1) else {
-                FileHandle.standardError.write(Data("usage: --render-png <path> [--period today|week|last30|all] [--lang zh|en] [--units western|chinese] [--currency usd|cny] [--mock] [--state live|empty|error|settings]\n".utf8))
+                FileHandle.standardError.write(Data(usage.utf8))
                 exit(2)
             }
-            setupRenderPNG(path: CommandLine.arguments[idx + 1])
+            let path = CommandLine.arguments[idx + 1]
+            guard !path.hasPrefix("--") else {
+                FileHandle.standardError.write(Data(usage.utf8))
+                exit(1)
+            }
+            setupRenderPNG(path: path)
             return
         }
 
@@ -150,6 +171,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 styleMask: [.titled, .closable],
                 backing: .buffered, defer: false
             )
+            // Programmatic windows default to released-when-closed, which
+            // would leave the delegate's strong reference dangling after the
+            // user closes the window.
+            window.isReleasedWhenClosed = false
             window.title = "TokscaleBar Preview"
             window.contentViewController = controller
             // Hug the content like the popover does, capped so tall states
@@ -158,6 +183,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             window.setContentSize(NSSize(width: 324, height: min(fit.height, 720)))
             window.center()
             window.makeKeyAndOrderFront(nil)
+            previewWindow = window
         }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -194,7 +220,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         cancellable = snapshotChanged
             .merge(with: metricChanged, unitChanged, currencyChanged, rateChanged)
             .sink { [weak self] in self?.updateTitle() }
-        updateTitle()
     }
 
     /// Applies debug appearance and state flags. Persistence is disabled so
@@ -211,12 +236,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         case .empty: model.pinnedSnapshot = Mock.empty
         case .error:
             model.fetchesLiveData = false
-            model.lastError = settings.l10n.errorText(TokscaleError.binaryNotFound)
+            model.lastError = .binaryNotFound
         case .settings: model.showSettings = true
         }
     }
 
-    /// `--render-png <path> [--period today|week|last30|all] [--lang zh|en]
+    /// `--render-png <path> [--period today|week|last30|all] [--lang system|zh|en]
     /// [--units western|chinese] [--currency usd|cny] [--mock]
     /// [--state live|empty|error|settings]`: renders once data arrives,
     /// then exits 0. Static states (`--mock` / non-live `--state`) skip the
@@ -256,7 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
         model.$lastError.compactMap { $0 }.first().sink { [weak self] error in
             guard let self, self.model.snapshot == nil else { return }
-            FileHandle.standardError.write(Data((error + "\n").utf8))
+            FileHandle.standardError.write(Data((self.model.settings.l10n.errorText(error) + "\n").utf8))
             exit(1)
         }.store(in: &renderObservers)
 
@@ -272,7 +297,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func togglePopover() {
-        guard statusItem.button != nil else { return }
         if NSApp.currentEvent?.type == .rightMouseUp {
             showStatusMenu()
             return
@@ -286,6 +310,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func openPopover() {
+        guard !popover.isShown else { return }
         guard let button = statusItem.button else { return }
         model.refresh()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)

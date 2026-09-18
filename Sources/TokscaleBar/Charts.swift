@@ -36,6 +36,8 @@ struct BarChart: View {
 }
 
 /// One horizontal stacked capsule showing cost share per client, with a legend.
+/// The legend renders one row per entry of `shares` and caps nothing itself —
+/// callers are responsible for truncating (the dashboard passes top 5 + Other).
 struct ClientShareView: View {
     let shares: [(client: String, cost: Double)]
     var currency: AppCurrency = .usd
@@ -49,6 +51,11 @@ struct ClientShareView: View {
                     ForEach(Array(shares.enumerated()), id: \.offset) { index, share in
                         Rectangle()
                             .fill(Color.palette[index % Color.palette.count])
+                            // Shaving a fixed 2pt off each segment's
+                            // proportional width approximates a gap between
+                            // neighbors so adjacent colors stay readable
+                            // inside the capsule; the floor keeps tiny shares
+                            // from collapsing to nothing.
                             .frame(width: max(geo.size.width * share.cost / total - 2, 4))
                     }
                 }

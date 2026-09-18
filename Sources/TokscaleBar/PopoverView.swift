@@ -5,7 +5,19 @@ import SwiftUI
 /// excludes the menu bar; the rest is the popover arrow plus breathing room.
 /// Anything shorter shows in full — a hardcoded cap clipped real content.
 private func maxPopoverHeight() -> CGFloat {
-    (NSScreen.main?.visibleFrame.height ?? 740) - 44
+    maxPopoverHeight(screen: statusBarScreen())
+}
+
+/// An accessory app has no key window, so NSScreen.main can name the wrong
+/// display. PopoverView doesn't own the status item, so find the status bar
+/// button's window through NSApp and use the screen it lives on.
+private func statusBarScreen() -> NSScreen? {
+    NSApp.windows.first { NSStringFromClass(type(of: $0)) == "NSStatusBarWindow" }?.screen
+}
+
+private func maxPopoverHeight(screen: NSScreen?) -> CGFloat {
+    let height = (screen ?? NSScreen.main)?.visibleFrame.height ?? 740
+    return height - 44
 }
 
 enum Period: String, CaseIterable, Identifiable {
@@ -103,6 +115,7 @@ struct PopoverView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.tertiary)
+            .accessibilityLabel(l10n.settingsTitle)
         }
     }
 
@@ -123,7 +136,7 @@ struct PopoverView: View {
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(heroDateLabel(snapshot))
+                Text(periodDateLabel(snapshot))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
@@ -151,8 +164,12 @@ struct PopoverView: View {
 
     /// Spending trend semantics: less than yesterday is green, more is orange.
     private func deltaBadge(_ delta: Double) -> some View {
-        let tint: Color = delta >= 0 ? .orange : .green
-        return Label(deltaText(delta), systemImage: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
+        // A sub-1% wobble rounds to 0 — arrowing and tinting it would claim a
+        // trend that isn't there, so it renders as a neutral zero instead.
+        let neutral = (delta * 100).rounded() == 0
+        let tint: Color = neutral ? .secondary : (delta >= 0 ? .orange : .green)
+        return Label(neutral ? "0%" : deltaText(delta),
+                     systemImage: neutral ? "arrow.right" : (delta >= 0 ? "arrow.up.right" : "arrow.down.right"))
             .font(.system(size: 10, weight: .bold))
             .monospacedDigit()
             .foregroundStyle(tint)
@@ -169,31 +186,38 @@ struct PopoverView: View {
             .foregroundStyle(.secondary)
     }
 
-    private func heroDateLabel(_ snapshot: Snapshot) -> String {
-        let locale = l10n.locale
+    /// Date range the current period covers, shown next to the hero and as the
+    /// chart caption — one function so the two can never drift apart.
+    private func periodDateLabel(_ snapshot: Snapshot) -> String {
+        func range(_ first: String?, _ last: String?, _ format: (String?) -> String) -> String {
+            // Empty history has no endpoints; a lone dash reads better than
+            // two blanks or sentinel dates.
+            guard let first, let last else { return "—" }
+            return "\(format(first)) – \(format(last))"
+        }
         switch period {
         case .today:
-            return Date.now.formatted(.dateTime.month(.abbreviated).day().locale(locale))
+            return Date.now.formatted(.dateTime.month(.abbreviated).day().locale(l10n.locale))
         case .week:
-            return "\(shortDate(snapshot.weekDays.first?.date)) – \(shortDate(snapshot.weekDays.last?.date))"
+            return range(snapshot.weekDays.first?.date, snapshot.weekDays.last?.date, shortDate)
         case .last30:
-            return "\(shortDate(snapshot.last30Days.first?.date)) – \(shortDate(snapshot.last30Days.last?.date))"
+            return range(snapshot.last30Days.first?.date, snapshot.last30Days.last?.date, shortDate)
         case .all:
-            return "\(fullDate(snapshot.allDays.first?.date)) – \(fullDate(snapshot.allDays.last?.date))"
+            return range(snapshot.allDays.first?.date, snapshot.allDays.last?.date, fullDate)
         }
     }
 
     private func shortDate(_ date: String?) -> String {
         guard let date, date.count >= 10 else { return "" }
         let md = String(date.suffix(5))
-        return settings.language == .zh ? md.replacingOccurrences(of: "-", with: "/") : md
+        return settings.language.resolved == .zh ? md.replacingOccurrences(of: "-", with: "/") : md
     }
 
     /// All-time ranges can span years, so keep the year: 2026/07/05.
     private func fullDate(_ date: String?) -> String {
-        guard let date, date.count >= 10 else { return "?" }
+        guard let date, date.count >= 10 else { return "" }
         let ymd = String(date.prefix(10))
-        return settings.language == .zh ? ymd.replacingOccurrences(of: "-", with: "/") : ymd
+        return settings.language.resolved == .zh ? ymd.replacingOccurrences(of: "-", with: "/") : ymd
     }
 
     // MARK: Chart
@@ -208,7 +232,7 @@ struct PopoverView: View {
                 }
                 sectionTitle(chartTitle)
                 Spacer()
-                Text(chartCaption(snapshot))
+                Text(periodDateLabel(snapshot))
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
             }
@@ -256,20 +280,6 @@ struct PopoverView: View {
         .card(radius: 12)
     }
 
-    private func chartCaption(_ snapshot: Snapshot) -> String {
-        let locale = l10n.locale
-        switch period {
-        case .today:
-            return Date.now.formatted(.dateTime.month(.abbreviated).day().locale(locale))
-        case .week:
-            return "\(shortDate(snapshot.weekDays.first?.date)) – \(shortDate(snapshot.weekDays.last?.date))"
-        case .last30:
-            return "\(shortDate(snapshot.last30Days.first?.date)) – \(shortDate(snapshot.last30Days.last?.date))"
-        case .all:
-            return "\(fullDate(snapshot.allDays.first?.date)) – \(fullDate(snapshot.allDays.last?.date))"
-        }
-    }
-
     private var hourAxis: some View {
         HStack {
             ForEach([0, 6, 12, 18], id: \.self) { hour in
@@ -292,9 +302,11 @@ struct PopoverView: View {
         }
     }
 
-    /// Month label under each all-time bar; thins out beyond a year of bars.
+    /// Month label under each all-time bar; past a year of bars the labels
+    /// would crowd into each other, so they thin out — never denser than
+    /// every second bar.
     private func allAxis(_ months: [String]) -> some View {
-        let strideBy = max(months.count / 12, 1)
+        let strideBy = months.count > 12 ? max(months.count / 12, 2) : 1
         return HStack(spacing: 0) {
             ForEach(Array(months.enumerated()), id: \.offset) { index, month in
                 Text(index % strideBy == 0 ? l10n.monthLabel(month) : "")
@@ -341,24 +353,30 @@ struct PopoverView: View {
 
     // MARK: Clients
 
+    @ViewBuilder
     private func clientShare(_ report: Report) -> some View {
+        let shares = Self.clientShares(report, l10n: l10n)
+        if !shares.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionTitle(l10n.byClient)
+                ClientShareView(shares: shares, currency: settings.currency, rate: settings.usdToCnyRate)
+            }
+        }
+    }
+
+    /// Per-client cost shares, ranked descending; everything past TOP 5
+    /// buckets into "Other".
+    private static func clientShares(_ report: Report, l10n: L10n) -> [(client: String, cost: Double)] {
         var byClient: [String: Double] = [:]
         for entry in report.entries {
             byClient[entry.client, default: 0] += entry.cost
         }
-        let ranked = byClient.sorted { $0.value > $1.value }
+        // Cache-only traffic can price at 0 and still yield a client entry; a
+        // zero share would render as an empty legend row, so drop it.
+        let ranked = byClient.filter { $0.value > 0 }.sorted { $0.value > $1.value }
         let top = ranked.prefix(5).map { (client: $0.key, cost: $0.value) }
         let rest = ranked.dropFirst(5).reduce(0.0) { $0 + $1.value }
-        let shares = rest > 0 ? top + [(client: l10n.other, cost: rest)] : top
-
-        return Group {
-            if !shares.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    sectionTitle(l10n.byClient)
-                    ClientShareView(shares: shares, currency: settings.currency, rate: settings.usdToCnyRate)
-                }
-            }
-        }
+        return rest > 0 ? top + [(client: l10n.other, cost: rest)] : top
     }
 
     // MARK: Footer & misc
@@ -378,6 +396,7 @@ struct PopoverView: View {
             .foregroundStyle(.secondary)
             .disabled(model.isRefreshing)
             .help(l10n.refreshNow)
+            .accessibilityLabel(l10n.refreshNow)
             Button(action: { NSApplication.shared.terminate(nil) }) {
                 Image(systemName: "power")
                     .font(.system(size: 10, weight: .medium))
@@ -385,13 +404,19 @@ struct PopoverView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .help(l10n.quit)
+            .accessibilityLabel(l10n.quit)
         }
     }
 
-    private func errorCard(_ error: String) -> some View {
+    private func errorCard(_ error: TokscaleError) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-            Text(error).font(.system(size: 11)).fixedSize(horizontal: false, vertical: true)
+            // Localize at render time so the banner follows a language
+            // switch; lineLimit keeps unbounded CLI messages in check.
+            Text(l10n.errorText(error))
+                .font(.system(size: 11))
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 4)
             Button(l10n.retry, action: model.refresh)
                 .font(.system(size: 10, weight: .semibold))
@@ -426,24 +451,15 @@ struct PopoverView: View {
         String(format: "%+.0f%%", delta * 100)
     }
 
-    private static let dayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.calendar = Calendar(identifier: .gregorian)
-        f.timeZone = .autoupdatingCurrent
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
-
     private func isToday(_ date: String) -> Bool {
-        date == Self.dayFormatter.string(from: Date())
+        date == Dates.dayString(Date())
     }
 
     private func weekdayLetter(_ date: String) -> String {
-        guard let d = Self.dayFormatter.date(from: date) else { return "" }
-        // Use the formatter's Gregorian calendar, not Calendar.current, so a
+        guard let d = Dates.dayDate(date) else { return "" }
+        // Use the shared Gregorian calendar, not Calendar.current, so a
         // non-Gregorian system calendar can't skew the weekday.
-        return l10n.weekdayLetters[Self.dayFormatter.calendar.component(.weekday, from: d) - 1]
+        return l10n.weekdayLetters[Dates.calendar.component(.weekday, from: d) - 1]
     }
 }
 
@@ -568,6 +584,7 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
+                .accessibilityLabel(l10n.back)
                 Text(l10n.settingsTitle)
                     .font(.system(size: 13, weight: .semibold))
                 Spacer()
@@ -580,7 +597,7 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 150)
+                    .frame(width: 240)
                 }
                 rowDivider
                 settingRow(l10n.numberUnits) {
@@ -588,6 +605,7 @@ struct SettingsView: View {
                         ForEach(UnitStyle.allCases) { Text($0.label).tag($0) }
                     }
                     .labelsHidden()
+                    .accessibilityLabel(l10n.numberUnits)
                     .pickerStyle(.segmented)
                     .frame(width: 150)
                 }
@@ -597,6 +615,7 @@ struct SettingsView: View {
                         ForEach(AppCurrency.allCases) { Text($0.label).tag($0) }
                     }
                     .labelsHidden()
+                    .accessibilityLabel(l10n.currencyLabel)
                     .pickerStyle(.segmented)
                     .frame(width: 150)
                 }
@@ -616,6 +635,7 @@ struct SettingsView: View {
                         ForEach(MenuMetric.allCases) { Text(l10n.metricLabel($0)).tag($0) }
                     }
                     .labelsHidden()
+                    .accessibilityLabel(l10n.menuBarShows)
                     .pickerStyle(.segmented)
                     .frame(width: 170)
                 }
@@ -625,6 +645,7 @@ struct SettingsView: View {
                         ForEach(RefreshInterval.allCases) { Text(l10n.intervalLabel($0)).tag($0) }
                     }
                     .labelsHidden()
+                    .accessibilityLabel(l10n.refreshEvery)
                     .pickerStyle(.segmented)
                     .frame(width: 170)
                 }
@@ -632,6 +653,7 @@ struct SettingsView: View {
                 settingRow(l10n.launchAtLogin) {
                     Toggle("", isOn: $settings.launchAtLogin)
                         .labelsHidden()
+                        .accessibilityLabel(l10n.launchAtLogin)
                         .toggleStyle(.switch)
                         .controlSize(.small)
                 }
