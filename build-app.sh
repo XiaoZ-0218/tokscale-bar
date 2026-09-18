@@ -5,11 +5,14 @@
 set -eu
 cd "$(dirname "$0")"
 
-# One swift build call both compiles and reports the output dir; invoking it
-# twice would wait on the build lock a second time for nothing.
+# --show-bin-path only prints the path without building, so it rides along
+# with the real build; calling it separately would wait on the build lock a
+# second time for nothing.
 if [ "${1:-}" = "--universal" ]; then
+    swift build -c release --arch arm64 --arch x86_64
     BIN_DIR="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
 else
+    swift build -c release
     BIN_DIR="$(swift build -c release --show-bin-path)"
 fi
 BIN="$BIN_DIR/TokscaleBar"
