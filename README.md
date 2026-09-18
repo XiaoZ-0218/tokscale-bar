@@ -14,7 +14,7 @@ A lightweight macOS menu bar app that turns your local [tokscale](https://github
 
 - **Menu bar number**: today's spend (switchable to tokens / messages)
 - **Rich popover dashboard** with four period tabs (Today / 7 Days / 30 Days / All):
-  - Flat hero card with spend, token & message pills, and a day-over-day delta badge
+  - Flat hero card with spend, token & message pills, and a day-over-day delta badge; tap (or Settings) to swap whether cost or tokens is the headline
   - Today → 24-hour bar chart with the current hour highlighted
   - 7 Days → daily bar chart with today highlighted
   - 30 Days → daily bar chart with today highlighted
@@ -24,7 +24,7 @@ A lightweight macOS menu bar app that turns your local [tokscale](https://github
 - **Bilingual UI**: 中文 / English switcher (optionally follows the system)
 - **Currencies**: USD `$` / CNY `¥` with a configurable exchange rate
 - **Number units**: Western `K/M/B` or Chinese `万/亿`
-- **Settings**: menu bar metric, refresh interval (1/5/15 min), launch at login, custom tokscale path
+- **Settings**: menu bar metric, hero metric (cost / tokens), refresh interval (1/5/15 min), launch at login, custom tokscale path
 - **Right-click the menu bar icon**: quick menu with Refresh / Settings / Quit
 
 ### Requirements
@@ -71,7 +71,7 @@ All data stays local.
 
 - **菜单栏实时数字**：今日花费（可切换为 Tokens / 消息数）
 - **丰富仪表盘**，四个时段页签（今天 / 近 7 天 / 近 30 天 / 全部）：
-  - 纯色花费大卡片（Tokens、消息数胶囊，今日附「较昨日」涨跌）
+  - 纯色大卡片（花费 / Tokens 可点切换，另一项和消息数在胶囊里，今日附「较昨日」涨跌）
   - 今天 → 24 小时分时段柱状图（当前小时高亮）
   - 近 7 天 → 每日柱状图（今天高亮）
   - 近 30 天 → 每日柱状图（今天高亮）
@@ -81,7 +81,7 @@ All data stays local.
 - **中英双语**：设置里一键切换 中文 / English（可选跟随系统）
 - **货币**：美元 `$` / 人民币 `¥`，汇率可自定义（默认 7.2）
 - **数字单位**：英制 `K/M/B` 或 中制 `万/亿`
-- **自定义设置**：菜单栏显示内容、刷新间隔（1/5/15 分钟）、登录时启动、tokscale 路径
+- **自定义设置**：菜单栏显示内容、主卡片显示（花费 / Tokens）、刷新间隔（1/5/15 分钟）、登录时启动、tokscale 路径
 - **右键菜单栏图标**：快捷菜单（刷新 / 设置 / 退出）
 
 ### 下载
