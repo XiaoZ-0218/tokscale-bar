@@ -130,9 +130,10 @@ struct PopoverView: View {
     // MARK: Hero
 
     private func heroCard(_ report: Report, snapshot: Snapshot) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let metric = settings.heroMetric
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(l10n.heroTitle(period))
+                Text(l10n.heroTitle(period, metric: metric))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -141,17 +142,25 @@ struct PopoverView: View {
                     .foregroundStyle(.tertiary)
             }
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(cost(report.totalCost))
+                Text(heroHeadline(report, metric: metric))
                     .font(.system(size: 34, weight: .heavy, design: .rounded))
                     .monospacedDigit()
-                if period == .today, let delta = dayOverDay(snapshot.weekDays) {
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                if period == .today, let delta = TokscaleService.dayOverDay(snapshot.weekDays, metric: metric) {
                     deltaBadge(delta)
                 }
             }
             Rectangle().fill(.primary.opacity(0.06)).frame(height: 1)
             HStack {
-                miniStat(icon: "number",
-                         text: l10n.tokensPill(Format.tokens(report.totalTokens, settings.unitStyle)))
+                switch metric {
+                case .cost:
+                    miniStat(icon: "number",
+                             text: l10n.tokensPill(Format.tokens(report.totalTokens, settings.unitStyle)))
+                case .tokens:
+                    miniStat(icon: settings.currency == .cny ? "yensign" : "dollarsign",
+                             text: cost(report.totalCost))
+                }
                 Spacer()
                 miniStat(icon: "bubble.left.and.bubble.right",
                          text: l10n.messagesPill(report.totalMessages))
@@ -159,7 +168,22 @@ struct PopoverView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { toggleHeroMetric() }
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(l10n.heroTitle(period, metric: metric))
         .card()
+    }
+
+    private func heroHeadline(_ report: Report, metric: HeroMetric) -> String {
+        switch metric {
+        case .cost: return cost(report.totalCost)
+        case .tokens: return Format.tokens(report.totalTokens, settings.unitStyle)
+        }
+    }
+
+    private func toggleHeroMetric() {
+        settings.heroMetric = settings.heroMetric == .cost ? .tokens : .cost
     }
 
     /// Spending trend semantics: less than yesterday is green, more is orange.
@@ -438,15 +462,6 @@ struct PopoverView: View {
             .foregroundStyle(.primary.opacity(0.85))
     }
 
-    /// Percent change of today vs. yesterday, nil when yesterday had no spend.
-    private func dayOverDay(_ week: [DayUsage]) -> Double? {
-        guard week.count >= 2 else { return nil }
-        let yesterday = week[week.count - 2].totals.cost
-        let today = week[week.count - 1].totals.cost
-        guard yesterday > 0.005 else { return nil }
-        return (today - yesterday) / yesterday
-    }
-
     private func deltaText(_ delta: Double) -> String {
         String(format: "%+.0f%%", delta * 100)
     }
@@ -638,6 +653,16 @@ struct SettingsView: View {
                     .accessibilityLabel(l10n.menuBarShows)
                     .pickerStyle(.segmented)
                     .frame(width: 170)
+                }
+                rowDivider
+                settingRow(l10n.heroShows) {
+                    Picker("", selection: $settings.heroMetric) {
+                        ForEach(HeroMetric.allCases) { Text(l10n.metricLabel($0)).tag($0) }
+                    }
+                    .labelsHidden()
+                    .accessibilityLabel(l10n.heroShows)
+                    .pickerStyle(.segmented)
+                    .frame(width: 150)
                 }
                 rowDivider
                 settingRow(l10n.refreshEvery) {

@@ -6,6 +6,11 @@ enum MenuMetric: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum HeroMetric: String, CaseIterable, Identifiable {
+    case cost, tokens
+    var id: String { rawValue }
+}
+
 enum RefreshInterval: TimeInterval, CaseIterable, Identifiable {
     case minute = 60
     case fiveMinutes = 300
@@ -28,11 +33,14 @@ final class Settings: ObservableObject {
 
     /// UserDefaults keys. Raw values are the on-disk format and must stay stable.
     private enum Key: String {
-        case menuMetric, refreshInterval, tokscalePath, unitStyle, language, currency, usdToCnyRate
+        case menuMetric, heroMetric, refreshInterval, tokscalePath, unitStyle, language, currency, usdToCnyRate
     }
 
     @Published var menuMetric: MenuMetric {
         didSet { guard persists else { return }; defaults.set(menuMetric.rawValue, forKey: Key.menuMetric.rawValue) }
+    }
+    @Published var heroMetric: HeroMetric {
+        didSet { guard persists else { return }; defaults.set(heroMetric.rawValue, forKey: Key.heroMetric.rawValue) }
     }
     @Published var refreshInterval: RefreshInterval {
         didSet { guard persists else { return }; defaults.set(refreshInterval.rawValue, forKey: Key.refreshInterval.rawValue) }
@@ -92,6 +100,7 @@ final class Settings: ObservableObject {
 
     init() {
         menuMetric = MenuMetric(rawValue: defaults.string(forKey: Key.menuMetric.rawValue) ?? "") ?? .cost
+        heroMetric = HeroMetric(rawValue: defaults.string(forKey: Key.heroMetric.rawValue) ?? "") ?? .cost
         let interval = defaults.double(forKey: Key.refreshInterval.rawValue)
         refreshInterval = RefreshInterval(rawValue: interval) ?? .fiveMinutes
         tokscalePath = defaults.string(forKey: Key.tokscalePath.rawValue) ?? ""

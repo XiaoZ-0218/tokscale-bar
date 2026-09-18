@@ -356,6 +356,23 @@ final class TokscaleService {
         return byMonth.sorted { $0.key < $1.key }.map { (month: $0.key, cost: $0.value) }
     }
 
+    /// Day-over-day change of the last two days: today vs yesterday,
+    /// as a signed fraction of yesterday. Nil when there's no meaningful base.
+    static func dayOverDay(_ week: [DayUsage], metric: HeroMetric) -> Double? {
+        guard week.count >= 2,
+              let today = week.last, let yesterday = week.dropLast().last else { return nil }
+        switch metric {
+        case .cost:
+            let base = yesterday.totals.cost
+            guard base > 0.005 else { return nil }
+            return (today.totals.cost - base) / base
+        case .tokens:
+            let base = yesterday.totals.tokens
+            guard base > 0 else { return nil }
+            return Double(today.totals.tokens - base) / Double(base)
+        }
+    }
+
     /// `count` days ending `now`, zero-filled. `now` is injectable for tests.
     static func padDays(_ days: [DayUsage], count: Int, now: Date = Date()) -> [DayUsage] {
         // graph can repeat a date; uniqueKeysWithValues would trap.

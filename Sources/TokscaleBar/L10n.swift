@@ -51,12 +51,16 @@ struct L10n {
         }
     }
 
-    func heroTitle(_ period: Period) -> String {
-        switch period {
-        case .today: return zh ? "今日花费" : "Today's Spend"
-        case .week: return zh ? "近 7 天花费" : "Last 7 Days"
-        case .last30: return zh ? "近 30 天花费" : "Last 30 Days"
-        case .all: return zh ? "全部花费" : "All Time"
+    func heroTitle(_ period: Period, metric: HeroMetric = .cost) -> String {
+        switch (period, metric) {
+        case (.today, .cost): return zh ? "今日花费" : "Today's Spend"
+        case (.week, .cost): return zh ? "近 7 天花费" : "Last 7 Days"
+        case (.last30, .cost): return zh ? "近 30 天花费" : "Last 30 Days"
+        case (.all, .cost): return zh ? "全部花费" : "All Time"
+        case (.today, .tokens): return zh ? "今日 Tokens" : "Today's Tokens"
+        case (.week, .tokens): return zh ? "近 7 天 Tokens" : "Last 7 Days Tokens"
+        case (.last30, .tokens): return zh ? "近 30 天 Tokens" : "Last 30 Days Tokens"
+        case (.all, .tokens): return zh ? "全部 Tokens" : "All Time Tokens"
         }
     }
 
@@ -110,6 +114,7 @@ struct L10n {
     var settingsTitle: String { zh ? "设置" : "Settings" }
     var back: String { zh ? "返回" : "Back" }
     var menuBarShows: String { zh ? "菜单栏显示" : "Menu Bar Shows" }
+    var heroShows: String { zh ? "主卡片显示" : "Hero Shows" }
     var refreshEvery: String { zh ? "刷新间隔" : "Refresh Every" }
     var launchAtLogin: String { zh ? "登录时启动" : "Launch at Login" }
     var numberUnits: String { zh ? "数字单位" : "Number Units" }
@@ -129,6 +134,10 @@ struct L10n {
         case .tokens: return "Tokens"
         case .messages: return zh ? "消息数" : "Messages"
         }
+    }
+
+    func metricLabel(_ metric: HeroMetric) -> String {
+        metricLabel(metric == .cost ? MenuMetric.cost : .tokens)
     }
 
     func intervalLabel(_ interval: RefreshInterval) -> String {
