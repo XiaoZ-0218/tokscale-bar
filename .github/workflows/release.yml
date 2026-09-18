@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: write
@@ -14,8 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Same gate as CI: never ship a release that fails the unit tests.
+      - run: swift test
+
       # Universal (arm64 + x86_64) build; bundle version comes from the tag.
       - run: VERSION=${GITHUB_REF_NAME#v} ./build-app.sh --universal
+
+      # The zip/dmg must contain a real universal binary.
+      - name: Verify universal binary
+        run: lipo -info TokscaleBar.app/Contents/MacOS/TokscaleBar | grep x86_64
 
       - name: Package zip
         run: ditto -c -k --sequesterRsrc --keepParent TokscaleBar.app "TokscaleBar-${GITHUB_REF_NAME}-macOS.zip"
@@ -31,7 +38,9 @@ jobs:
             "TokscaleBar-${GITHUB_REF_NAME}-macOS.dmg"
 
       # Creates the GitHub Release for the tag and uploads the app bundles.
-      - uses: softprops/action-gh-release@v2
+      # Pinned to the v2.6.2 commit SHA: the floating v2 tag is mutable, so
+      # referencing it would let a retag silently change what runs here.
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: TokscaleBar ${{ github.ref_name }}
           files: |

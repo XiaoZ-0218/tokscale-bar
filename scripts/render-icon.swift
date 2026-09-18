@@ -3,8 +3,13 @@ import AppKit
 // Renders the TokscaleBar app icon (hand-drawn single-line bolt on a light
 // superellipse plate) as a full .iconset, then iconutil packs the .icns.
 // usage: swift scripts/render-icon.swift <output.icns>
+// With no argument it writes to Resources/AppIcon.icns, derived from this
+// script's location (scripts/) so any working directory works.
 
-let outIcns = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "Resources/AppIcon.icns"
+let scriptURL = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
+let defaultIcns = scriptURL.deletingLastPathComponent().deletingLastPathComponent()
+    .appendingPathComponent("Resources/AppIcon.icns").path
+let outIcns = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : defaultIcns
 let iconset = NSTemporaryDirectory() + "AppIcon.iconset"
 try? FileManager.default.removeItem(atPath: iconset)
 try! FileManager.default.createDirectory(atPath: iconset, withIntermediateDirectories: true)
@@ -13,14 +18,18 @@ func canvas(_ file: String, points: CGFloat, scale: CGFloat, draw: (CGFloat) -> 
     let px = points * scale
     guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(px), pixelsHigh: Int(px),
         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { return }
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else {
+        fatalError("failed to create bitmap for \(file)")
+    }
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     NSGraphicsContext.current?.imageInterpolation = .high
     draw(px)
     NSGraphicsContext.restoreGraphicsState()
-    try! rep.representation(using: .png, properties: [:])?
-        .write(to: URL(fileURLWithPath: "\(iconset)/\(file)"))
+    guard let png = rep.representation(using: .png, properties: [:]) else {
+        fatalError("failed to encode PNG for \(file)")
+    }
+    try! png.write(to: URL(fileURLWithPath: "\(iconset)/\(file)"))
 }
 
 // Apple icon plates are superellipses, not circular-arc roundrects.

@@ -14,14 +14,14 @@ A lightweight macOS menu bar app that turns your local [tokscale](https://github
 
 - **Menu bar number**: today's spend (switchable to tokens / messages)
 - **Rich popover dashboard** with four period tabs (Today / 7 Days / 30 Days / All):
-  - Gradient hero card with spend, token & message pills, and a day-over-day delta badge
+  - Flat hero card with spend, token & message pills, and a day-over-day delta badge
   - Today → 24-hour bar chart with the current hour highlighted
   - 7 Days → daily bar chart with today highlighted
   - 30 Days → daily bar chart with today highlighted
   - All → monthly bar chart with the current month highlighted
   - Top-5 model breakdown (model, client, tokens, cost, relative-share bar)
   - Client share: stacked proportion bar with legend
-- **Bilingual UI**: 中文 / English switcher (follows system by default)
+- **Bilingual UI**: 中文 / English switcher (optionally follows the system)
 - **Currencies**: USD `$` / CNY `¥` with a configurable exchange rate
 - **Number units**: Western `K/M/B` or Chinese `万/亿`
 - **Settings**: menu bar metric, refresh interval (1/5/15 min), launch at login, custom tokscale path
@@ -44,14 +44,14 @@ Grab the latest release from [Releases](../../releases) — `TokscaleBar-*-macOS
 open TokscaleBar.app  # launch (menu bar only, no Dock icon)
 ```
 
-For development, `swift run` runs it in the foreground. Releases are built by GitHub Actions: push a `v*` tag and the Release workflow builds a universal binary, packages the DMG + zip, and publishes them with generated notes.
+For development, `swift run` runs it in the foreground. If the repo lives on iCloud Drive, point SwiftPM's scratch path at a local folder — building inside the synced folder is slow and flaky — e.g. `swift test --scratch-path /tmp/tokscalebar-test`. Releases are built by GitHub Actions: push a `v1.2.3`-style tag and the Release workflow builds a universal binary, packages the DMG + zip, and publishes them with generated notes.
 
 ### Debug flags
 
 - `--preview-window` — show the popover content in a regular window; honors the appearance/state flags below
 - `--render-png <path> [flags]` — render offscreen to a PNG (used to generate the screenshots above)
-- Appearance flags: `--period today|week|last30|all`, `--lang zh|en`, `--units western|chinese`, `--currency usd|cny`
-- State flags: `--mock` (deterministic fake data, no tokscale needed) and `--state empty|error|settings` — e.g. `--render-png shot.png --mock --state settings` for fast UI iteration without touching real data
+- Appearance flags: `--period today|week|last30|all`, `--lang system|zh|en`, `--units western|chinese`, `--currency usd|cny`
+- State flags: `--mock` (deterministic fake data, no tokscale needed) and `--state live|empty|error|settings` — e.g. `--render-png shot.png --mock --state settings` for fast UI iteration without touching real data
 
 ### How it works
 
@@ -71,14 +71,14 @@ All data stays local.
 
 - **菜单栏实时数字**：今日花费（可切换为 Tokens / 消息数）
 - **丰富仪表盘**，四个时段页签（今天 / 近 7 天 / 近 30 天 / 全部）：
-  - 渐变花费大卡片（Tokens、消息数胶囊，今日附「较昨日」涨跌）
+  - 纯色花费大卡片（Tokens、消息数胶囊，今日附「较昨日」涨跌）
   - 今天 → 24 小时分时段柱状图（当前小时高亮）
   - 近 7 天 → 每日柱状图（今天高亮）
   - 近 30 天 → 每日柱状图（今天高亮）
   - 全部 → 每月柱状图（当月高亮）
   - 模型 TOP 5 明细（模型、客户端、Tokens、费用、占比底条）
   - 客户端占比堆叠条 + 图例
-- **中英双语**：设置里一键切换 中文 / English（默认跟随系统）
+- **中英双语**：设置里一键切换 中文 / English（可选跟随系统）
 - **货币**：美元 `$` / 人民币 `¥`，汇率可自定义（默认 7.2）
 - **数字单位**：英制 `K/M/B` 或 中制 `万/亿`
 - **自定义设置**：菜单栏显示内容、刷新间隔（1/5/15 分钟）、登录时启动、tokscale 路径
@@ -97,14 +97,16 @@ All data stays local.
 open TokscaleBar.app  # 启动（无 Dock 图标，只看菜单栏）
 ```
 
-发布由 GitHub Actions 自动完成：推送 `v*` 标签即可触发 Release 工作流，自动构建通用二进制、打包 DMG + zip 并发布 Release。
+如果仓库位于 iCloud Drive 同步目录，建议把 SwiftPM 构建目录指到本地磁盘（在同步目录里构建又慢又容易出错），例如 `swift test --scratch-path /tmp/tokscalebar-test`。
+
+发布由 GitHub Actions 自动完成：推送 `v1.2.3` 格式的标签即可触发 Release 工作流，自动构建通用二进制、打包 DMG + zip 并发布 Release。
 
 ### 调试参数
 
 - `--preview-window` — 把弹窗内容显示在普通窗口里，同样支持下面的外观/状态参数
 - `--render-png <路径> [参数]` — 离屏渲染为 PNG（README 截图就是这样生成的）
-- 外观参数：`--period today|week|last30|all`、`--lang zh|en`、`--units western|chinese`、`--currency usd|cny`
-- 状态参数：`--mock`（确定性假数据，无需 tokscale）和 `--state empty|error|settings`——例如 `--render-png shot.png --mock --state settings`，不碰真实数据就能快速迭代 UI
+- 外观参数：`--period today|week|last30|all`、`--lang system|zh|en`、`--units western|chinese`、`--currency usd|cny`
+- 状态参数：`--mock`（确定性假数据，无需 tokscale）和 `--state live|empty|error|settings`——例如 `--render-png shot.png --mock --state settings`，不碰真实数据就能快速迭代 UI
 
 ### 文件结构
 
