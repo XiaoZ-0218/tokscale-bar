@@ -15,6 +15,7 @@ A lightweight macOS menu bar app that turns your local [tokscale](https://github
 - **Menu bar number**: today's spend (switchable to tokens / messages)
 - **Rich popover dashboard** with four period tabs (Today / 7 Days / 30 Days / All):
   - Flat hero card with spend, token & message pills, and a day-over-day delta badge; tap (or Settings) to swap whether cost or tokens is the headline
+  - Subscription quotas from `tokscale usage` (remaining bar + reset time per signed-in provider)
   - Today → 24-hour bar chart with the current hour highlighted
   - 7 Days → daily bar chart with today highlighted
   - 30 Days → daily bar chart with today highlighted
@@ -56,8 +57,8 @@ For development, `swift run` runs it in the foreground. If the repo lives on iCl
 ### How it works
 
 Pure AppKit + SwiftUI, zero third-party dependencies. The app spawns the local
-`tokscale` CLI (`--json --today/--week`, bare `--json` for all time, `--json --since/--until` for the last 30 days, `hourly --json --today`, `graph`)
-concurrently via `Process` (last 30 days uses `--since/--until`), decodes the JSON, and refreshes on a timer.
+`tokscale` CLI (`--json --today/--week`, bare `--json` for all time, `--json --since/--until` for the last 30 days, `hourly --json --today`, `graph`, `usage --json`)
+concurrently via `Process` (last 30 days uses `--since/--until`; `usage` is fetched separately so a quota miss cannot take down the dashboard), decodes the JSON, and refreshes on a timer.
 All data stays local.
 
 ---
@@ -72,6 +73,7 @@ All data stays local.
 - **菜单栏实时数字**：今日花费（可切换为 Tokens / 消息数）
 - **丰富仪表盘**，四个时段页签（今天 / 近 7 天 / 近 30 天 / 全部）：
   - 纯色大卡片（花费 / Tokens 可点切换，另一项和消息数在胶囊里，今日附「较昨日」涨跌）
+  - 订阅余量（读 `tokscale usage`：已登录提供商的剩余额度条和重置时间）
   - 今天 → 24 小时分时段柱状图（当前小时高亮）
   - 近 7 天 → 每日柱状图（今天高亮）
   - 近 30 天 → 每日柱状图（今天高亮）
