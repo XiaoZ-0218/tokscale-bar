@@ -12,6 +12,10 @@ final class AppModel: ObservableObject {
     @Published var isRefreshing = false
     /// Whether the popover shows the settings page. Reset when the popover closes.
     @Published var showSettings = false
+    @Published var usage: [UsageAccount] = []
+    /// Set when `tokscale usage` failed; independent of `lastError` so a
+    /// quota miss never replaces the cost dashboard.
+    @Published var usageError: TokscaleError?
 
     let settings = Settings()
     private let service = TokscaleService()
@@ -22,6 +26,10 @@ final class AppModel: ObservableObject {
             fetchesLiveData = pinnedSnapshot == nil
             snapshot = pinnedSnapshot
             lastUpdated = Date()
+            if pinnedSnapshot != nil {
+                usage = Mock.usage
+                usageError = nil
+            }
         }
     }
     /// Debug (`--state error`): when false, refresh() is a no-op and any
@@ -73,22 +81,45 @@ final class AppModel: ObservableObject {
             defer {
                 DispatchQueue.main.async { self.isRefreshing = false }
             }
-            do {
-                let snapshot = try self.service.fetchSnapshot()
-                DispatchQueue.main.async {
-                    guard self.fetchesLiveData else { return }
-                    self.snapshot = snapshot
-                    self.lastError = nil
-                    self.lastUpdated = Date()
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    guard self.fetchesLiveData else { return }
-                    // Non-tokscale errors (e.g. JSON decoding) keep their
-                    // message via .failed; see L10n.errorText.
-                    self.lastError = error as? TokscaleError ?? .failed(error.localizedDescription)
+            let group = DispatchGroup()
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                defer { group.leave() }
+                do {
+                    let snapshot = try self.service.fetchSnapshot()
+                    DispatchQueue.main.async {
+                        guard self.fetchesLiveData else { return }
+                        self.snapshot = snapshot
+                        self.lastError = nil
+                        self.lastUpdated = Date()
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        guard self.fetchesLiveData else { return }
+                        // Non-tokscale errors (e.g. JSON decoding) keep their
+                        // message via .failed; see L10n.errorText.
+                        self.lastError = error as? TokscaleError ?? .failed(error.localizedDescription)
+                    }
                 }
             }
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                defer { group.leave() }
+                do {
+                    let usage = try self.service.fetchUsage()
+                    DispatchQueue.main.async {
+                        guard self.fetchesLiveData else { return }
+                        self.usage = usage
+                        self.usageError = nil
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        guard self.fetchesLiveData else { return }
+                        self.usageError = error as? TokscaleError ?? .failed(error.localizedDescription)
+                    }
+                }
+            }
+            group.wait()
         }
     }
 

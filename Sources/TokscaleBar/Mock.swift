@@ -17,6 +17,33 @@ enum Mock {
         )
     }
 
+    static var usage: [UsageAccount] {
+        [
+            UsageAccount(provider: "Kimi", plan: nil, email: nil, metrics: [
+                UsageMetric(label: "Session", usedPercent: 0, remainingPercent: 100,
+                            remainingLabel: "100/100 left", resetsAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(3 * 3600))),
+                UsageMetric(label: "Weekly", usedPercent: 66, remainingPercent: 34,
+                            remainingLabel: "34/100 left", resetsAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(36 * 3600))),
+            ]),
+            UsageAccount(provider: "Grok Build", plan: nil, email: nil, metrics: [
+                UsageMetric(label: "Weekly", usedPercent: 33, remainingPercent: 67,
+                            remainingLabel: nil, resetsAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(3 * 24 * 3600))),
+            ]),
+            UsageAccount(provider: "Copilot", plan: "Individual", email: nil, metrics: [
+                UsageMetric(label: "Chat", usedPercent: 0, remainingPercent: 100,
+                            remainingLabel: "200/200 left", resetsAt: "2026-10-01"),
+                UsageMetric(label: "Completions", usedPercent: 0.7, remainingPercent: 99.3,
+                            remainingLabel: "1987/2000 left", resetsAt: "2026-10-01"),
+                UsageMetric(label: "Premium", usedPercent: 100, remainingPercent: 0,
+                            remainingLabel: "0/0 left", resetsAt: "2026-10-01"),
+            ]),
+            UsageAccount(provider: "Codex", plan: "Free", email: nil, metrics: [
+                UsageMetric(label: "30d", usedPercent: 0, remainingPercent: 100,
+                            remainingLabel: nil, resetsAt: "2026-10-19T02:17:26+00:00"),
+            ]),
+        ]
+    }
+
     /// All-zero snapshot: exercises the chart empty state and ¥0 hero.
     static var empty: Snapshot {
         Snapshot(

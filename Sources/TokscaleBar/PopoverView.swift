@@ -71,6 +71,7 @@ struct PopoverView: View {
                         errorCard(error)
                     }
                     heroCard(report, snapshot: snapshot)
+                    subscriptionsCard
                     chartSection(snapshot)
                     if !report.entries.isEmpty {
                         modelBreakdown(report)
@@ -173,6 +174,86 @@ struct PopoverView: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(l10n.heroTitle(period, metric: metric))
         .card()
+    }
+
+    // MARK: Subscriptions
+
+    @ViewBuilder
+    private var subscriptionsCard: some View {
+        if !model.usage.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                sectionTitle(l10n.subscriptions)
+                VStack(spacing: 8) {
+                    ForEach(model.usage) { account in
+                        usageRow(account)
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .card(radius: 12)
+        } else if model.usageError != nil, model.snapshot != nil {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.circle")
+                Text(l10n.subscriptionsUnavailable)
+            }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func usageRow(_ account: UsageAccount) -> some View {
+        let primary = account.primaryMetric
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(account.provider)
+                    .font(.system(size: 11, weight: .semibold))
+                if let plan = account.plan, !plan.isEmpty {
+                    Text(plan)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer(minLength: 4)
+                if let primary {
+                    Text(primary.remainingLabel ?? String(format: "%.0f%%", primary.remainingPercent))
+                        .font(.system(size: 10, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    if let reset = l10n.usageReset(primary) {
+                        Text(reset)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            if let primary {
+                usageBar(primary)
+            }
+            if !account.secondaryMetrics.isEmpty {
+                Text(account.secondaryMetrics.map { secondaryCaption($0) }.joined(separator: "  ·  "))
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private func usageBar(_ metric: UsageMetric) -> some View {
+        let remaining = min(max(metric.remainingPercent / 100, 0), 1)
+        let tint: Color = remaining <= 0.001 ? .red : (remaining < 0.2 ? .orange : .brand)
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(.primary.opacity(0.08))
+                Capsule().fill(tint).frame(width: max(4, geo.size.width * remaining))
+            }
+        }
+        .frame(height: 4)
+    }
+
+    private func secondaryCaption(_ metric: UsageMetric) -> String {
+        let amount = metric.remainingLabel ?? String(format: "%.0f%%", metric.remainingPercent)
+        return "\(metric.label) \(amount)"
     }
 
     private func heroHeadline(_ report: Report, metric: HeroMetric) -> String {

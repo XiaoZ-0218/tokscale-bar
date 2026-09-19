@@ -72,6 +72,101 @@ struct Snapshot {
     let allDays: [DayUsage]     // full history from `graph`, deduped and ascending
 }
 
+/// One provider from `tokscale usage --json`. Extra keys (account, credits)
+/// are ignored; a missing login simply isn't in the array.
+struct UsageAccount: Decodable, Identifiable {
+    let provider: String
+    let plan: String?
+    let email: String?
+    let metrics: [UsageMetric]
+
+    var id: String { [provider, plan ?? "", email ?? ""].joined(separator: "|") }
+
+    /// Weekly quota if the provider has one; otherwise the most-used metric.
+    var primaryMetric: UsageMetric? {
+        if let weekly = metrics.first(where: { $0.label.compare("Weekly", options: .caseInsensitive) == .orderedSame }) {
+            return weekly
+        }
+        return metrics.max(by: { $0.usedPercent < $1.usedPercent })
+    }
+
+    var secondaryMetrics: [UsageMetric] {
+        guard let primary = primaryMetric else { return [] }
+        return metrics.filter { $0.label != primary.label }
+    }
+}
+
+struct UsageMetric: Decodable, Identifiable {
+    let label: String
+    let usedPercent: Double
+    let remainingPercent: Double
+    let remainingLabel: String?
+    let resetsAt: String?
+
+    var id: String { label }
+
+    enum CodingKeys: String, CodingKey {
+        case label, usedPercent = "used_percent", remainingPercent = "remaining_percent"
+        case remainingLabel = "remaining_label", resetsAt = "resets_at"
+    }
+
+    /// Short reset caption: "in 3h" / "15:30" / "Sun" / "Oct 19".
+    static func resetLabel(resetsAt: String?, now: Date = Date(), locale: Locale,
+                           zh: Bool, timeZone: TimeZone = .autoupdatingCurrent) -> String? {
+        guard let resetsAt, let date = parseReset(resetsAt) else { return nil }
+        let interval = date.timeIntervalSince(now)
+        if interval > 0 && interval < 12 * 3600 {
+            let hours = max(1, Int(interval / 3600))
+            return zh ? "\(hours) 小时后" : "in \(hours)h"
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        calendar.locale = locale
+        if calendar.isDate(date, inSameDayAs: now) {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = timeZone
+            formatter.dateFormat = "HH:mm"
+            return formatter.string(from: date)
+        }
+        let days = calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)
+        ).day ?? 0
+        if (1..<7).contains(days) {
+            if zh {
+                let names = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+                return names[calendar.component(.weekday, from: date) - 1]
+            }
+            let formatter = DateFormatter()
+            formatter.locale = locale
+            formatter.timeZone = timeZone
+            formatter.dateFormat = "EEE"
+            return formatter.string(from: date)
+        }
+        if zh {
+            return "\(calendar.component(.month, from: date))月\(calendar.component(.day, from: date))日"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
+    }
+
+    private static func parseReset(_ string: String) -> Date? {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso.date(from: string) { return date }
+        iso.formatOptions = [.withInternetDateTime]
+        if let date = iso.date(from: string) { return date }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: string)
+    }
+}
+
 // MARK: - Service
 
 enum TokscaleError: Error {
@@ -278,6 +373,13 @@ final class TokscaleService {
             last30Days: Self.padDays(graph.contributions, count: 30),
             allDays: Self.dedupedDays(graph.contributions)
         )
+    }
+
+    /// Subscription quotas. Kept off `fetchSnapshot` so a usage failure
+    /// cannot take down the cost/token dashboard.
+    func fetchUsage() throws -> [UsageAccount] {
+        let data = try run(["usage", "--json"])
+        return try Self.decode([UsageAccount].self, from: data, job: "usage", using: JSONDecoder())
     }
 
     /// Decode one job's payload, wrapping a DecodingError in TokscaleError.failed

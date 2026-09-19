@@ -178,6 +178,7 @@ final class TokscaleServiceProcessTests: XCTestCase {
     private let reportJSON = #"{"entries":[],"totalInput":0,"totalOutput":0,"totalCacheRead":0,"totalCacheWrite":0,"totalMessages":0,"totalCost":0}"#
     private let hourlyJSON = #"{"entries":[{"hour":"2026-09-06 09:00","cost":1.5}]}"#
     private let graphJSON = #"{"contributions":[{"date":"2026-09-06","totals":{"tokens":100,"cost":1.5,"messages":3}}]}"#
+    private let usageJSON = #"[{"provider":"Kimi","metrics":[{"label":"Weekly","used_percent":66.0,"remaining_percent":34.0,"remaining_label":"34/100 left","resets_at":"2026-09-20T03:22:58Z"}]}]"#
 
     override func setUpWithError() throws {
         tempDir = FileManager.default.temporaryDirectory
@@ -210,8 +211,19 @@ final class TokscaleServiceProcessTests: XCTestCase {
               echo '\(hourlyJSON)'
               exit 0
             fi
+            if [ "$1" = "usage" ]; then
+              echo '\(usageJSON)'
+              exit 0
+            fi
             echo '\(reportJSON)'
             """)
+    }
+
+    func testFetchUsageDecodesAccountsFromFakeBinary() throws {
+        let accounts = try makeService(pointingAt: try writeFullFakeBinary()).fetchUsage()
+        XCTAssertEqual(accounts.map(\.provider), ["Kimi"])
+        XCTAssertEqual(accounts[0].primaryMetric?.label, "Weekly")
+        XCTAssertEqual(accounts[0].primaryMetric?.remainingPercent, 34)
     }
 
     private func makeService(pointingAt path: String) -> TokscaleService {

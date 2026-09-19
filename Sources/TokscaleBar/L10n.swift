@@ -109,6 +109,12 @@ struct L10n {
     }
     var byClient: String { zh ? "客户端占比" : "BY CLIENT" }
     var other: String { zh ? "其他" : "Other" }
+    var subscriptions: String { zh ? "订阅" : "Subscriptions" }
+    var subscriptionsUnavailable: String { zh ? "订阅暂不可用" : "Subscriptions unavailable" }
+
+    func usageReset(_ metric: UsageMetric) -> String? {
+        UsageMetric.resetLabel(resetsAt: metric.resetsAt, locale: locale, zh: zh)
+    }
 
     // Settings
     var settingsTitle: String { zh ? "设置" : "Settings" }
