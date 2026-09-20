@@ -300,7 +300,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let settings = model.settings
         settings.persists = false
         model.subscriptionStore.persists = false
-        if let language = flags.language { settings.language = language }
+        if let language = flags.language {
+            settings.language = language
+            // Mirror init-time derivation (Settings.init): a language switch
+            // implies its default units/currency unless the caller overrode
+            // them explicitly below.
+            if flags.units == nil {
+                settings.unitStyle = language.resolved == .zh ? .chinese : .western
+            }
+            if flags.currency == nil {
+                settings.currency = language.resolved == .zh ? .cny : .usd
+            }
+        }
         if let units = flags.units { settings.unitStyle = units }
         if let currency = flags.currency { settings.currency = currency }
         if flags.mock { model.pinnedSnapshot = Mock.snapshot }
