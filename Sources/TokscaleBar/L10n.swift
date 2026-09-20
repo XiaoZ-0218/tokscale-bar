@@ -114,6 +114,13 @@ struct L10n {
         return count == 1 ? "TOP 1 MODEL" : "TOP \(count) MODELS"
     }
     var byClient: String { zh ? "客户端占比" : "BY CLIENT" }
+    // Entry detail grid
+    var detailInput: String { zh ? "输入" : "Input" }
+    var detailOutput: String { zh ? "输出" : "Output" }
+    var detailCacheRead: String { zh ? "缓存读" : "Cache read" }
+    var detailCacheWrite: String { zh ? "缓存写" : "Cache write" }
+    var detailReasoning: String { zh ? "推理" : "Reasoning" }
+    var detailMessages: String { zh ? "消息" : "Messages" }
     var other: String { zh ? "其他" : "Other" }
     var subscriptions: String { zh ? "订阅" : "Subscriptions" }
     var subscriptionsUnavailable: String { zh ? "订阅暂不可用" : "Subscriptions unavailable" }

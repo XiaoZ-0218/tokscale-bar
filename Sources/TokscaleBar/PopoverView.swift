@@ -29,6 +29,7 @@ struct PopoverView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var settings: Settings
     @State private var period: Period
+    @State private var expandedEntry: String?
 
     init(model: AppModel, settings: Settings, initialPeriod: Period = .today) {
         self.model = model
@@ -464,7 +465,15 @@ struct PopoverView: View {
                 ForEach(Array(top.enumerated()), id: \.offset) { index, entry in
                     ModelRow(rank: index + 1, entry: entry, maxCost: maxCost,
                              tokensText: Format.tokens(entry.tokens, settings.unitStyle),
-                             costText: cost(entry.cost))
+                             costText: cost(entry.cost),
+                             expanded: expandedEntry == entry.stableID,
+                             unitStyle: settings.unitStyle,
+                             l10n: l10n,
+                             onToggle: {
+                                 withAnimation(.easeInOut(duration: 0.18)) {
+                                     expandedEntry = expandedEntry == entry.stableID ? nil : entry.stableID
+                                 }
+                             })
                 }
             }
         }
@@ -574,56 +583,104 @@ struct PopoverView: View {
 }
 
 
-/// One ranked model row: proportional cost bar underneath, lifts on hover.
+/// One ranked model row: proportional cost bar underneath, lifts on hover,
+/// and taps open a token-breakdown grid (input/output/cache/reasoning/messages).
 private struct ModelRow: View {
     let rank: Int
     let entry: Report.Entry
     let maxCost: Double
     let tokensText: String
     let costText: String
+    let expanded: Bool
+    let unitStyle: UnitStyle
+    let l10n: L10n
+    let onToggle: () -> Void
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text("\(rank)")
-                .font(.system(size: 9, weight: .bold, design: .rounded))
-                .foregroundStyle(.tertiary)
-                .frame(width: 12, alignment: .leading)
-            Text(entry.model)
-                .font(.system(size: 11, weight: .medium))
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Text(entry.client)
-                .font(.system(size: 8, weight: .semibold))
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(.secondary.opacity(0.12), in: Capsule())
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 4)
-            Text(tokensText)
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-                .monospacedDigit()
-            Text(costText)
-                .font(.system(size: 11, weight: .semibold))
-                .monospacedDigit()
-                .frame(minWidth: 54, alignment: .trailing)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background {
-            GeometryReader { geo in
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.primary.opacity(0.05))
-                    .frame(width: geo.size.width * entry.cost / maxCost)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text("\(rank)")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 12, alignment: .leading)
+                Text(entry.model)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(entry.client)
+                    .font(.system(size: 8, weight: .semibold))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(.secondary.opacity(0.12), in: Capsule())
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                Text(tokensText)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+                Text(costText)
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .frame(minWidth: 54, alignment: .trailing)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(expanded ? 90 : 0))
             }
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(.primary.opacity(hovering ? 0.05 : 0))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background {
+                GeometryReader { geo in
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.primary.opacity(0.05))
+                        .frame(width: geo.size.width * entry.cost / maxCost)
+                }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(.primary.opacity(hovering ? 0.05 : 0))
+            }
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onToggle)
+            .accessibilityAddTraits(.isButton)
+
+            if expanded {
+                detailGrid
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .animation(.easeOut(duration: 0.12), value: hovering)
         .onHover { hovering = $0 }
+    }
+
+    /// Two-column token breakdown. Reasoning hides when the model reports none.
+    private var detailGrid: some View {
+        let rows: [(String, String)] = [
+            (l10n.detailInput, Format.tokens(entry.input, unitStyle)),
+            (l10n.detailOutput, Format.tokens(entry.output, unitStyle)),
+            (l10n.detailCacheRead, Format.tokens(entry.cacheRead, unitStyle)),
+            (l10n.detailCacheWrite, Format.tokens(entry.cacheWrite, unitStyle)),
+        ] + (entry.reasoning.map { [(l10n.detailReasoning, Format.tokens($0, unitStyle))] } ?? [])
+        + [(l10n.detailMessages, "\(entry.messageCount)")]
+
+        return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())],
+                         alignment: .leading, spacing: 4) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(spacing: 4) {
+                    Text(row.0)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                    Spacer(minLength: 2)
+                    Text(row.1)
+                        .font(.system(size: 9, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 }
 

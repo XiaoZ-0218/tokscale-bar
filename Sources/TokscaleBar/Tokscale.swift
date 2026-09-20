@@ -16,6 +16,9 @@ struct Report: Decodable {
         let messageCount: Int
 
         var tokens: Int { input + output + cacheRead + cacheWrite + (reasoning ?? 0) }
+
+        /// One client can serve the same model name, so identity needs both.
+        var stableID: String { client + "|" + model }
     }
 
     let entries: [Entry]
