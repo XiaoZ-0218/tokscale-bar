@@ -30,6 +30,7 @@ struct PopoverView: View {
     @ObservedObject var settings: Settings
     @State private var period: Period
     @State private var expandedEntry: String?
+    @State private var expandedSubscription: UUID?
 
     init(model: AppModel, settings: Settings, initialPeriod: Period = .today) {
         self.model = model
@@ -72,6 +73,7 @@ struct PopoverView: View {
                         errorCard(error)
                     }
                     heroCard(report, snapshot: snapshot)
+                    roiSection
                     subscriptionsCard
                     chartSection(snapshot)
                     if !report.entries.isEmpty {
@@ -177,13 +179,240 @@ struct PopoverView: View {
         .card()
     }
 
+    // MARK: - ROI
+
+    private static let roiDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Dates.calendar
+        f.dateFormat = "M/d"
+        return f
+    }()
+
+    private func cycleKey(for sub: Subscription, now: Date = Date()) -> CycleKey {
+        let cycle = Billing.currentCycle(billingDay: sub.billingDay, now: now)
+        return CycleKey(since: Dates.dayString(cycle.start), until: Dates.dayString(now))
+    }
+
+    /// nil = this window's fetch failed or hasn't landed yet.
+    private func cycleSpend(for sub: Subscription) -> Double? {
+        guard let report = model.cycleReports[cycleKey(for: sub)] else { return nil }
+        return ROI.matchedCost(report.entries, keywords: sub.keywords)
+    }
+
+    private func priceText(_ sub: Subscription) -> String {
+        let formatted = sub.price.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", sub.price)
+            : String(format: "%.2f", sub.price)
+        return "\(sub.currency.symbol)\(formatted)\(l10n.perMonth)"
+    }
+
+    @ViewBuilder
+    private var roiSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                sectionTitle(l10n.roiTitle)
+                Spacer()
+                Button(action: addSubscription) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(l10n.addSubscription)
+            }
+            if model.subscriptionStore.subscriptions.isEmpty {
+                Text(l10n.subscriptionsEmpty)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(model.subscriptionStore.subscriptions) { sub in
+                        subscriptionRow(sub)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .card(radius: 12)
+    }
+
+    private func addSubscription() {
+        let sub = Subscription(name: "", price: 20, currency: settings.currency,
+                               billingDay: 1, keywords: [])
+        model.subscriptionStore.add(sub)
+        expandedSubscription = sub.id
+        model.refresh()
+    }
+
+    private func subscriptionRow(_ sub: Subscription) -> some View {
+        let spend = cycleSpend(for: sub)
+        let multiple = spend.map {
+            ROI.multiple(costUSD: $0, price: sub.price, currency: sub.currency,
+                         rate: settings.usdToCnyRate)
+        }
+        let expanded = expandedSubscription == sub.id
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(sub.name.isEmpty ? l10n.fieldName : sub.name)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(priceText(sub))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 4)
+                if let multiple {
+                    Text(String(format: "×%.1f", multiple))
+                        .font(.system(size: 10, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(multiple >= 1 ? Color.brand : .orange)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background((multiple >= 1 ? Color.brand : .orange).opacity(0.12), in: Capsule())
+                } else {
+                    Text(l10n.spendUnavailable)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(expanded ? 90 : 0))
+            }
+            if let spend, let multiple {
+                roiBar(multiple: min(multiple, 1), reached: multiple >= 1)
+                let cycle = Billing.currentCycle(billingDay: sub.billingDay, now: Date())
+                let daysLeft = max(0, Dates.calendar.dateComponents(
+                    [.day], from: Dates.calendar.startOfDay(for: Date()),
+                    to: Dates.calendar.startOfDay(for: cycle.end)).day ?? 0)
+                let startText = Self.roiDateFormatter.string(from: cycle.start)
+                let endText = Self.roiDateFormatter.string(
+                    from: Dates.calendar.date(byAdding: .day, value: -1, to: cycle.end) ?? cycle.end)
+                Text(l10n.cycleLine(startText, endText, daysLeft: daysLeft)
+                     + " · " + l10n.cycleSpend + " "
+                     + cost(spend))
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            if expanded {
+                subscriptionEditor(sub)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                expandedSubscription = expanded ? nil : sub.id
+            }
+        }
+        .accessibilityAddTraits(.isButton)
+    }
+
+    /// Payback progress: cost vs price. Green once the sub paid for itself.
+    private func roiBar(multiple: Double, reached: Bool) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(.primary.opacity(0.08))
+                Capsule()
+                    .fill(reached ? AnyShapeStyle(brandGradient) : AnyShapeStyle(Color.orange))
+                    .frame(width: max(4, geo.size.width * multiple))
+            }
+        }
+        .frame(height: 4)
+    }
+
+    /// Live-editing form: every change writes straight to the store and
+    /// triggers a refetch so the badge updates immediately.
+    private func subscriptionEditor(_ sub: Subscription) -> some View {
+        let binding = Binding<Subscription>(
+            get: { model.subscriptionStore.subscriptions.first { $0.id == sub.id } ?? sub },
+            set: { model.subscriptionStore.update($0) }
+        )
+        let keywordText = Binding<String>(
+            get: { binding.wrappedValue.keywords.joined(separator: ", ") },
+            set: { text in
+                var copy = binding.wrappedValue
+                copy.keywords = text.split(separator: ",").map {
+                    $0.trimmingCharacters(in: .whitespaces)
+                }
+                model.subscriptionStore.update(copy)
+            }
+        )
+        return VStack(alignment: .leading, spacing: 8) {
+            Rectangle().fill(.primary.opacity(0.06)).frame(height: 1)
+            editorRow(l10n.fieldName) {
+                TextField("Claude Pro", text: binding.name)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 11))
+                    .onSubmit { model.refresh() }
+            }
+            editorRow(l10n.fieldPrice) {
+                TextField("20", value: binding.price, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 11))
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 64)
+                    .onSubmit { model.refresh() }
+                Picker("", selection: binding.currency) {
+                    ForEach(AppCurrency.allCases) { Text($0.symbol).tag($0) }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 84)
+            }
+            editorRow(l10n.fieldBillingDay) {
+                Stepper(l10n.dayOfMonth(binding.wrappedValue.billingDay),
+                        value: binding.billingDay, in: 1...31)
+                    .font(.system(size: 11))
+                    .onChange(of: binding.wrappedValue.billingDay) { _ in model.refresh() }
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(l10n.fieldKeywords)
+                    .font(.system(size: 10))
+                TextField("claude, anthropic", text: keywordText)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 11))
+                    .onSubmit { model.refresh() }
+                Text(l10n.keywordsFooter)
+                    .font(.system(size: 8))
+                    .foregroundStyle(.tertiary)
+            }
+            HStack {
+                Spacer()
+                Button(l10n.deleteSubscription) {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        expandedSubscription = nil
+                        model.subscriptionStore.remove(id: sub.id)
+                    }
+                }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.red)
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func editorRow<Content: View>(_ title: String,
+                                          @ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 8) {
+            Text(title)
+                .font(.system(size: 10))
+                .frame(width: 44, alignment: .leading)
+            Spacer(minLength: 0)
+            content()
+        }
+    }
+
     // MARK: Subscriptions
 
     @ViewBuilder
     private var subscriptionsCard: some View {
         if !model.usage.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                sectionTitle(l10n.subscriptions)
+                sectionTitle(l10n.quotas)
                 VStack(spacing: 8) {
                     ForEach(model.usage) { account in
                         usageRow(account)
