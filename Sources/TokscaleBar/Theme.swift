@@ -25,19 +25,33 @@ let brandGradient = LinearGradient(
     startPoint: .topLeading, endPoint: .bottomTrailing
 )
 
-/// The standard content card: a real surface (system control background)
-/// + hairline edge, one corner radius. Hand-tuned primary-opacity fills
-/// look muddy over the popover's vibrancy; semantic colors stay crisp.
+/// The standard content card. macOS 26+ gets real Liquid Glass; older systems
+/// get a frosted fallback — a vibrancy-adjacent surface with a top edge
+/// highlight that fakes the glass rim. Callers keep one modifier either way.
 struct CardStyle: ViewModifier {
     var radius: CGFloat = 14
+
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .background(Color(nsColor: .controlBackgroundColor),
-                        in: RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
-            }
+        if #available(macOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+        } else {
+            content
+                .background(Color(nsColor: .controlBackgroundColor),
+                            in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+                }
+                .overlay(alignment: .top) {
+                    LinearGradient(colors: [.white.opacity(0.1), .clear],
+                                   startPoint: .top, endPoint: .bottom)
+                        .frame(height: radius * 1.5)
+                        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+                        .allowsHitTesting(false)
+                }
+        }
     }
 }
 
