@@ -86,3 +86,50 @@ enum ROI {
         return costUSD / priceUSD
     }
 }
+
+/// UserDefaults-backed list of subscriptions. Mirrors Settings' `persists`
+/// switch so mock/render-png runs never dirty the user's real data.
+final class SubscriptionStore: ObservableObject {
+    var persists = true
+    @Published private(set) var subscriptions: [Subscription] = []
+
+    private let defaults: UserDefaults
+    private static let key = "subscriptions.v1"
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        load()
+    }
+
+    func add(_ subscription: Subscription) {
+        subscriptions.append(subscription)
+        save()
+    }
+
+    func update(_ subscription: Subscription) {
+        guard let index = subscriptions.firstIndex(where: { $0.id == subscription.id }) else { return }
+        subscriptions[index] = subscription
+        save()
+    }
+
+    func remove(id: UUID) {
+        subscriptions.removeAll { $0.id == id }
+        save()
+    }
+
+    /// Mock/preview channel: swap the list in memory without touching disk.
+    func replace(_ subscriptions: [Subscription]) {
+        self.subscriptions = subscriptions
+    }
+
+    private func load() {
+        guard let data = defaults.data(forKey: Self.key),
+              let decoded = try? JSONDecoder().decode([Subscription].self, from: data) else { return }
+        subscriptions = decoded
+    }
+
+    private func save() {
+        guard persists, let data = try? JSONEncoder().encode(subscriptions) else { return }
+        defaults.set(data, forKey: Self.key)
+    }
+}
