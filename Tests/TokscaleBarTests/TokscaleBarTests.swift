@@ -69,8 +69,8 @@ final class ReportDecodingTests: XCTestCase {
 }
 
 final class PaddingTests: XCTestCase {
-    private func day(_ date: String, cost: Double) -> DayUsage {
-        DayUsage(date: date, totals: .init(tokens: 0, cost: cost, messages: 0))
+    private func day(_ date: String, tokens: Int = 0, cost: Double = 0) -> DayUsage {
+        DayUsage(date: date, totals: .init(tokens: tokens, cost: cost, messages: 0))
     }
 
     func testPadHoursFills24AndParsesHour() {
@@ -112,13 +112,14 @@ final class PaddingTests: XCTestCase {
 
     func testMonthlyCostsGroupsAndOrdersByMonth() {
         let days = [
-            day("2026-08-31", cost: 1),
-            day("2026-07-01", cost: 2),
-            day("2026-08-01", cost: 4),
+            day("2026-08-31", tokens: 100, cost: 1),
+            day("2026-07-01", tokens: 200, cost: 2),
+            day("2026-08-01", tokens: 300, cost: 4),
         ]
         let months = TokscaleService.monthlyCosts(days)
         XCTAssertEqual(months.map(\.month), ["2026-07", "2026-08"])
         XCTAssertEqual(months.map(\.cost), [2, 5])
+        XCTAssertEqual(months.map(\.tokens), [200, 400])
     }
 
     func testPadThirtyDaysToleratesDuplicateDates() {
