@@ -455,14 +455,19 @@ final class TokscaleService {
             .sorted { $0.date < $1.date }
     }
 
-    /// Per-calendar-month cost totals, ascending. yyyy-MM keys sort lexically,
-    /// which is also chronological.
-    static func monthlyCosts(_ days: [DayUsage]) -> [(month: String, cost: Double)] {
-        var byMonth: [String: Double] = [:]
+    /// Per-calendar-month totals, ascending. yyyy-MM keys sort lexically,
+    /// which is also chronological. Tokens ride along for chart tooltips.
+    static func monthlyCosts(_ days: [DayUsage]) -> [(month: String, cost: Double, tokens: Int)] {
+        var byMonth: [String: (cost: Double, tokens: Int)] = [:]
         for day in days {
-            byMonth[String(day.date.prefix(7)), default: 0] += day.totals.cost
+            let key = String(day.date.prefix(7))
+            var bucket = byMonth[key] ?? (cost: 0, tokens: 0)
+            bucket.cost += day.totals.cost
+            bucket.tokens += day.totals.tokens
+            byMonth[key] = bucket
         }
-        return byMonth.sorted { $0.key < $1.key }.map { (month: $0.key, cost: $0.value) }
+        return byMonth.sorted { $0.key < $1.key }
+            .map { (month: $0.key, cost: $0.value.cost, tokens: $0.value.tokens) }
     }
 
     /// Day-over-day change of the last two days: today vs yesterday,

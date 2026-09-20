@@ -1,10 +1,17 @@
 import SwiftUI
 
-/// Vertical bar chart for hourly or daily costs. Bars at `highlight` index use the brand gradient.
+/// Vertical bar chart for hourly or daily costs. Bars at `highlight` index use
+/// the brand gradient. `labels`/`details` (same count as `values`) feed the
+/// hover tooltip: title line + pre-formatted value line. Callers format
+/// strings because the chart stays currency/locale-agnostic.
 struct BarChart: View {
     let values: [Double]
     var highlight: Int? = nil
     var maxBarHeight: CGFloat = 60
+    var labels: [String] = []
+    var details: [String] = []
+
+    @State private var hovering: Int?
 
     var body: some View {
         let peak = max(values.max() ?? 0, 0.0001)
@@ -19,15 +26,52 @@ struct BarChart: View {
                     .frame(maxWidth: .infinity)
                     .shadow(color: index == highlight ? Color.brand.opacity(0.5) : .clear,
                             radius: 5, y: 1)
+                    .opacity(hovering == nil || hovering == index ? 1 : 0.45)
+                    .contentShape(Rectangle())
+                    .onHover { hovering = $0 ? index : nil }
             }
         }
         .animation(.spring(response: 0.45, dampingFraction: 0.82), value: values)
+        .animation(.easeOut(duration: 0.1), value: hovering)
+        .overlay(alignment: .top) { tooltip }
+    }
+
+    /// Floating readout above the hovered bar, clamped so it never clips the
+    /// chart's left/right edge.
+    @ViewBuilder
+    private var tooltip: some View {
+        if let index = hovering, values.indices.contains(index) {
+            GeometryReader { geo in
+                let barWidth = geo.size.width / CGFloat(max(values.count, 1))
+                let centerX = barWidth * (CGFloat(index) + 0.5)
+                VStack(spacing: 1) {
+                    if labels.indices.contains(index) {
+                        Text(labels[index])
+                            .font(.system(size: 9, weight: .semibold))
+                    }
+                    if details.indices.contains(index) {
+                        Text(details[index])
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .monospacedDigit()
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(.regularMaterial, in: Capsule())
+                .overlay { Capsule().strokeBorder(.primary.opacity(0.1), lineWidth: 0.5) }
+                .fixedSize()
+                .position(x: min(max(centerX, 50), max(geo.size.width - 50, 50)), y: 12)
+                .allowsHitTesting(false)
+            }
+            .transition(.opacity)
+        }
     }
 
     private func style(for index: Int) -> AnyShapeStyle {
-        // Color is spent only on the highlighted bar; the rest stay neutral
-        // so the focal point reads instantly, heatmap-style.
-        if index == highlight { return AnyShapeStyle(brandGradient) }
+        // Hover promotes the touched bar to the brand gradient; the default
+        // highlight (today/last) only applies when nothing is hovered.
+        if index == hovering ?? highlight { return AnyShapeStyle(brandGradient) }
         return AnyShapeStyle(LinearGradient(
             colors: [Color.primary.opacity(0.2), Color.primary.opacity(0.1)],
             startPoint: .top, endPoint: .bottom

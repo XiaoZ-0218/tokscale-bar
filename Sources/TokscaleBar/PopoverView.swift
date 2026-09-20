@@ -361,22 +361,36 @@ struct PopoverView: View {
                 case .today:
                     BarChart(values: values,
                              highlight: Calendar.current.component(.hour, from: Date()),
-                             maxBarHeight: 52)
+                             maxBarHeight: 52,
+                             labels: snapshot.hours.map { l10n.hourLabel($0.hour) },
+                             details: values.map { cost($0) })
                     hourAxis
                 case .week:
                     BarChart(values: values,
                              highlight: values.count - 1,
-                             maxBarHeight: 52)
+                             maxBarHeight: 52,
+                             labels: snapshot.weekDays.map { shortDate($0.date) },
+                             details: snapshot.weekDays.map {
+                                 cost($0.totals.cost) + " · " + Format.tokens($0.totals.tokens, settings.unitStyle)
+                             })
                     weekAxis(snapshot.weekDays)
                 case .last30:
                     BarChart(values: values,
                              highlight: values.count - 1,
-                             maxBarHeight: 52)
+                             maxBarHeight: 52,
+                             labels: snapshot.last30Days.map { shortDate($0.date) },
+                             details: snapshot.last30Days.map {
+                                 cost($0.totals.cost) + " · " + Format.tokens($0.totals.tokens, settings.unitStyle)
+                             })
                     last30Axis(snapshot.last30Days)
                 case .all:
                     BarChart(values: values,
                              highlight: values.count - 1,
-                             maxBarHeight: 52)
+                             maxBarHeight: 52,
+                             labels: months.map { l10n.monthLabel($0.month) },
+                             details: months.map {
+                                 cost($0.cost) + " · " + Format.tokens($0.tokens, settings.unitStyle)
+                             })
                     allAxis(months.map(\.month))
                 }
             }
