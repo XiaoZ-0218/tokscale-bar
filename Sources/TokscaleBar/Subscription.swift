@@ -64,3 +64,25 @@ enum Billing {
         return BillingCycle(start: start, end: end)
     }
 }
+
+enum ROI {
+    /// Sum of costs for entries whose model or client contains any keyword
+    /// (case-insensitive substring). Empty/blank keywords match everything.
+    static func matchedCost(_ entries: [Report.Entry], keywords: [String]) -> Double {
+        let needles = keywords
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty }
+        guard !needles.isEmpty else { return entries.reduce(0) { $0 + $1.cost } }
+        return entries.reduce(0) { sum, entry in
+            let haystack = entry.model.lowercased() + "\u{0}" + entry.client.lowercased()
+            return needles.contains(where: { haystack.contains($0) }) ? sum + entry.cost : sum
+        }
+    }
+
+    /// Payback multiple: cycle cost in USD ÷ price in USD (CNY converts via rate).
+    static func multiple(costUSD: Double, price: Double, currency: AppCurrency, rate: Double) -> Double {
+        let priceUSD = currency == .cny ? price / max(rate, 0.01) : price
+        guard priceUSD > 0 else { return 0 }
+        return costUSD / priceUSD
+    }
+}
