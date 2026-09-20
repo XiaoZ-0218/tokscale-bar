@@ -31,6 +31,9 @@ struct PopoverView: View {
     @State private var period: Period
     @State private var expandedEntry: String?
     @State private var expandedSubscription: UUID?
+    /// Subscription row under the pointer, for hover feedback; keyed by id
+    /// because the rows are built by a method, not a View struct.
+    @State private var hoveringSubscription: UUID?
 
     init(model: AppModel, settings: Settings, initialPeriod: Period = .today) {
         self.model = model
@@ -323,9 +326,15 @@ struct PopoverView: View {
                     }
                 }
                 .contentShape(Rectangle())
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(.primary.opacity(hoveringSubscription == sub.id ? 0.05 : 0))
+                }
             }
             .buttonStyle(.plain)
             .accessibilityLabel(sub.name.isEmpty ? l10n.fieldName : sub.name)
+            .animation(.easeOut(duration: 0.12), value: hoveringSubscription)
+            .onHover { hoveringSubscription = $0 ? sub.id : nil }
             if expanded {
                 subscriptionEditor(sub)
                     .transition(.opacity.combined(with: .move(edge: .top)))
