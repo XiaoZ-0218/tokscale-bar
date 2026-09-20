@@ -16,8 +16,10 @@ final class AppModel: ObservableObject {
     /// Set when `tokscale usage` failed; independent of `lastError` so a
     /// quota miss never replaces the cost dashboard.
     @Published var usageError: TokscaleError?
+    @Published var cycleReports: [CycleKey: Report] = [:]
 
     let settings = Settings()
+    let subscriptionStore = SubscriptionStore()
     private let service = TokscaleService()
 
     /// Debug (`--mock` / `--state empty`): fixed data that freezes fetching.
@@ -29,6 +31,8 @@ final class AppModel: ObservableObject {
             if pinnedSnapshot != nil {
                 usage = Mock.usage
                 usageError = nil
+                subscriptionStore.replace(Mock.subscriptions)
+                cycleReports = Mock.cycleReports(for: Mock.subscriptions)
             }
         }
     }
@@ -117,6 +121,40 @@ final class AppModel: ObservableObject {
                         guard self.fetchesLiveData else { return }
                         self.usageError = error as? TokscaleError ?? .failed(error.localizedDescription)
                     }
+                }
+            }
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                defer { group.leave() }
+                // One tokscale query per distinct cycle window; subscriptions
+                // sharing a billing day share the fetch.
+                let now = Date()
+                var keys = Set<CycleKey>()
+                for sub in self.subscriptionStore.subscriptions {
+                    let cycle = Billing.currentCycle(billingDay: sub.billingDay, now: now)
+                    keys.insert(CycleKey(since: Dates.dayString(cycle.start),
+                                         until: Dates.dayString(now)))
+                }
+                var results: [CycleKey: Report] = [:]
+                let resultsLock = NSLock()
+                let fetches = DispatchGroup()
+                for key in keys {
+                    fetches.enter()
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        defer { fetches.leave() }
+                        // A failed window leaves no entry; the card shows
+                        // "spend unavailable" instead of poisoning others.
+                        if let report = try? self.service.fetchReport(since: key.since, until: key.until) {
+                            resultsLock.lock()
+                            results[key] = report
+                            resultsLock.unlock()
+                        }
+                    }
+                }
+                fetches.wait()
+                DispatchQueue.main.async {
+                    guard self.fetchesLiveData else { return }
+                    self.cycleReports = results
                 }
             }
             group.wait()
