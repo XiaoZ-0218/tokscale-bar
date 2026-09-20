@@ -14,6 +14,14 @@ struct Subscription: Codable, Identifiable, Equatable {
     var currency: AppCurrency
     var billingDay: Int // 1...31; out-of-range values clamp at math time
     var keywords: [String]
+
+    /// Editor input → keyword list: splits on half- and full-width commas,
+    /// trims whitespace, drops empties.
+    static func parseKeywords(_ text: String) -> [String] {
+        text.split { $0 == "," || $0 == "，" }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
 }
 
 /// [start, end): start is the most recent billing day (today counts),
