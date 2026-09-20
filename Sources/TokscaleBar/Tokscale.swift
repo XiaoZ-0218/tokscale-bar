@@ -505,7 +505,18 @@ enum Format {
         switch unit {
         case .western: return compact(Double(value))
         case .chinese: return compactChinese(Double(value))
+        case .exact: return exact(value)
         }
+    }
+
+    /// Full digits with comma groups (1,234,567). Hand-rolled: no formatter,
+    /// no locale dependence, deterministic in tests.
+    static func exact(_ value: Int) -> String {
+        let digits = String(abs(value))
+        let grouped = digits.reversed().enumerated().map { index, char in
+            index > 0 && index % 3 == 0 ? "\(char)," : "\(char)"
+        }.reversed().joined()
+        return (value < 0 ? "-" : "") + grouped
     }
 
     static func compact(_ value: Double) -> String {

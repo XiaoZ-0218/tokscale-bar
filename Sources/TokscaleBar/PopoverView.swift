@@ -703,7 +703,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .accessibilityLabel(l10n.numberUnits)
                     .pickerStyle(.segmented)
-                    .frame(width: 150)
+                    .frame(width: 210)
                 }
                 rowDivider
                 settingRow(l10n.currencyLabel) {

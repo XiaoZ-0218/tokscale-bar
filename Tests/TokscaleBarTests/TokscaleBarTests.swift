@@ -26,6 +26,13 @@ final class FormatTests: XCTestCase {
         XCTAssertEqual(Format.compactChinese(1_500_000), "150万")
         XCTAssertEqual(Format.compactChinese(100_000_000), "1.0亿")
     }
+
+    func testExactTokensKeepFullDigits() {
+        XCTAssertEqual(Format.tokens(0, .exact), "0")
+        XCTAssertEqual(Format.tokens(999, .exact), "999")
+        XCTAssertEqual(Format.tokens(1_234, .exact), "1,234")
+        XCTAssertEqual(Format.tokens(152_000_000, .exact), "152,000,000")
+    }
 }
 
 final class ReportDecodingTests: XCTestCase {
