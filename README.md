@@ -13,18 +13,19 @@ A lightweight macOS menu bar app that turns your local [tokscale](https://github
 ### Features
 
 - **Menu bar number**: today's spend (switchable to tokens / messages)
-- **Rich popover dashboard** with four period tabs (Today / 7 Days / 30 Days / All):
-  - Flat hero card with spend, token & message pills, and a day-over-day delta badge; tap (or Settings) to swap whether cost or tokens is the headline
+- **Rich popover dashboard** with four period tabs (Today / 7 Days / 30 Days / All), Liquid Glass cards on macOS 26+ (frosted fallback on older systems):
+  - Hero card with spend, token & message pills, and a day-over-day delta badge; tap (or Settings) to swap whether cost or tokens is the headline
+  - Subscription payback: add your plans (price, billing day, model/client keywords) and see the current cycle's payback multiple per subscription — green ×N once a plan has paid for itself
   - Subscription quotas from `tokscale usage` (remaining bar + reset time per signed-in provider)
-  - Today → 24-hour bar chart with the current hour highlighted
+  - Today → 24-hour bar chart with the current hour highlighted; hover a bar for the exact hour and value
   - 7 Days → daily bar chart with today highlighted
   - 30 Days → daily bar chart with today highlighted
   - All → monthly bar chart with the current month highlighted
-  - Top-5 model breakdown (model, client, tokens, cost, relative-share bar)
+  - Top-5 model breakdown (model, client, tokens, cost, relative-share bar); click a row to expand the input/output/cache token detail
   - Client share: stacked proportion bar with legend
 - **Bilingual UI**: 中文 / English switcher (optionally follows the system)
 - **Currencies**: USD `$` / CNY `¥` with a configurable exchange rate
-- **Number units**: Western `K/M/B` or Chinese `万/亿`
+- **Number units**: Western `K/M/B`, Chinese `万/亿`, or exact `1,234,567`
 - **Settings**: menu bar metric, hero metric (cost / tokens), refresh interval (1/5/15 min), launch at login, custom tokscale path
 - **Right-click the menu bar icon**: quick menu with Refresh / Settings / Quit
 
@@ -51,7 +52,7 @@ For development, `swift run` runs it in the foreground. If the repo lives on iCl
 
 - `--preview-window` — show the popover content in a regular window; honors the appearance/state flags below
 - `--render-png <path> [flags]` — render offscreen to a PNG (used to generate the screenshots above)
-- Appearance flags: `--period today|week|last30|all`, `--lang system|zh|en`, `--units western|chinese`, `--currency usd|cny`
+- Appearance flags: `--period today|week|last30|all`, `--lang system|zh|en`, `--units western|chinese|exact`, `--currency usd|cny`
 - State flags: `--mock` (deterministic fake data, no tokscale needed) and `--state live|empty|error|settings` — e.g. `--render-png shot.png --mock --state settings` for fast UI iteration without touching real data
 
 ### How it works
@@ -71,18 +72,19 @@ All data stays local.
 ### 功能
 
 - **菜单栏实时数字**：今日花费（可切换为 Tokens / 消息数）
-- **丰富仪表盘**，四个时段页签（今天 / 近 7 天 / 近 30 天 / 全部）：
-  - 纯色大卡片（花费 / Tokens 可点切换，另一项和消息数在胶囊里，今日附「较昨日」涨跌）
+- **丰富仪表盘**，四个时段页签（今天 / 近 7 天 / 近 30 天 / 全部），macOS 26+ 为液态玻璃卡片（旧系统回退为磨砂质感）：
+  - 大卡片（花费 / Tokens 可点切换，另一项和消息数在胶囊里，今日附「较昨日」涨跌）
+  - 订阅回本：填写你的订阅（价格、账单日、模型/客户端关键词），自动计算当前账期的回本倍数——回本后显示绿色 ×N 徽章
   - 订阅余量（读 `tokscale usage`：已登录提供商的剩余额度条和重置时间）
-  - 今天 → 24 小时分时段柱状图（当前小时高亮）
+  - 今天 → 24 小时分时段柱状图（当前小时高亮，悬停柱子显示具体时刻和数值）
   - 近 7 天 → 每日柱状图（今天高亮）
   - 近 30 天 → 每日柱状图（今天高亮）
   - 全部 → 每月柱状图（当月高亮）
-  - 模型 TOP 5 明细（模型、客户端、Tokens、费用、占比底条）
+  - 模型 TOP 5 明细（模型、客户端、Tokens、费用、占比底条），点击行展开输入/输出/缓存 Token 明细
   - 客户端占比堆叠条 + 图例
 - **中英双语**：设置里一键切换 中文 / English（可选跟随系统）
 - **货币**：美元 `$` / 人民币 `¥`，汇率可自定义（默认 7.2）
-- **数字单位**：英制 `K/M/B` 或 中制 `万/亿`
+- **数字单位**：英制 `K/M/B`、中制 `万/亿` 或 精确数字 `1,234,567`
 - **自定义设置**：菜单栏显示内容、主卡片显示（花费 / Tokens）、刷新间隔（1/5/15 分钟）、登录时启动、tokscale 路径
 - **右键菜单栏图标**：快捷菜单（刷新 / 设置 / 退出）
 
@@ -107,7 +109,7 @@ open TokscaleBar.app  # 启动（无 Dock 图标，只看菜单栏）
 
 - `--preview-window` — 把弹窗内容显示在普通窗口里，同样支持下面的外观/状态参数
 - `--render-png <路径> [参数]` — 离屏渲染为 PNG（README 截图就是这样生成的）
-- 外观参数：`--period today|week|last30|all`、`--lang system|zh|en`、`--units western|chinese`、`--currency usd|cny`
+- 外观参数：`--period today|week|last30|all`、`--lang system|zh|en`、`--units western|chinese|exact`、`--currency usd|cny`
 - 状态参数：`--mock`（确定性假数据，无需 tokscale）和 `--state live|empty|error|settings`——例如 `--render-png shot.png --mock --state settings`，不碰真实数据就能快速迭代 UI
 
 ### 文件结构
