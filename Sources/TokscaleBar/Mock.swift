@@ -44,6 +44,30 @@ enum Mock {
         ]
     }
 
+    /// Two subscriptions covering both badge states: Claude Pro pays for
+    /// itself on the week report (~3.5×), Kimi does not (~0.6×).
+    static var subscriptions: [Subscription] {
+        [
+            Subscription(name: "Claude Pro", price: 20, currency: .usd, billingDay: 1,
+                         keywords: ["claude"]),
+            Subscription(name: "Kimi", price: 99, currency: .cny, billingDay: 15,
+                         keywords: ["kimi", "k3"]),
+        ]
+    }
+
+    /// One report per distinct current-cycle window; reuses the week report,
+    /// whose entries already mix claude / grok / k3 models.
+    static func cycleReports(for subscriptions: [Subscription]) -> [CycleKey: Report] {
+        let now = Date()
+        var reports: [CycleKey: Report] = [:]
+        for sub in subscriptions {
+            let cycle = Billing.currentCycle(billingDay: sub.billingDay, now: now)
+            let key = CycleKey(since: Dates.dayString(cycle.start), until: Dates.dayString(now))
+            reports[key] = reports[key] ?? snapshot.week
+        }
+        return reports
+    }
+
     /// All-zero snapshot: exercises the chart empty state and ¥0 hero.
     static var empty: Snapshot {
         Snapshot(
