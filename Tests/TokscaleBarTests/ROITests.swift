@@ -54,4 +54,28 @@ final class ROITests: XCTestCase {
         XCTAssertEqual(ROI.multiple(costUSD: 48, price: 0, currency: .usd, rate: 7.2), 0)
         XCTAssertEqual(ROI.multiple(costUSD: 48, price: -5, currency: .usd, rate: 7.2), 0)
     }
+
+    // MARK: - parseKeywords
+
+    func testParseKeywordsHalfWidthComma() {
+        XCTAssertEqual(Subscription.parseKeywords("claude, anthropic"), ["claude", "anthropic"])
+    }
+
+    /// 中文用户常输入全角逗号。
+    func testParseKeywordsFullWidthComma() {
+        XCTAssertEqual(Subscription.parseKeywords("claude，anthropic"), ["claude", "anthropic"])
+    }
+
+    func testParseKeywordsMixedCommas() {
+        XCTAssertEqual(Subscription.parseKeywords("claude, anthropic，kimi"), ["claude", "anthropic", "kimi"])
+    }
+
+    func testParseKeywordsTrimsWhitespaceAndDropsEmpties() {
+        XCTAssertEqual(Subscription.parseKeywords("  claude , ,anthropic ， "), ["claude", "anthropic"])
+    }
+
+    func testParseKeywordsEmptyStringIsEmpty() {
+        XCTAssertEqual(Subscription.parseKeywords(""), [])
+        XCTAssertEqual(Subscription.parseKeywords(" , ， "), [])
+    }
 }

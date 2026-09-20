@@ -357,9 +357,7 @@ struct PopoverView: View {
             get: { binding.wrappedValue.keywords.joined(separator: ", ") },
             set: { text in
                 var copy = binding.wrappedValue
-                copy.keywords = text.split(separator: ",").map {
-                    $0.trimmingCharacters(in: .whitespaces)
-                }
+                copy.keywords = Subscription.parseKeywords(text)
                 model.subscriptionStore.update(copy)
             }
         )
