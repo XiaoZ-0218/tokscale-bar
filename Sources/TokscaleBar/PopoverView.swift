@@ -135,46 +135,47 @@ struct PopoverView: View {
 
     private func heroCard(_ report: Report, snapshot: Snapshot) -> some View {
         let metric = settings.heroMetric
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(l10n.heroTitle(period, metric: metric))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(periodDateLabel(snapshot))
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(heroHeadline(report, metric: metric))
-                    .font(.system(size: 34, weight: .heavy, design: .rounded))
-                    .monospacedDigit()
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                if period == .today, let delta = TokscaleService.dayOverDay(snapshot.weekDays, metric: metric) {
-                    deltaBadge(delta)
+        return Button(action: toggleHeroMetric) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(l10n.heroTitle(period, metric: metric))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(periodDateLabel(snapshot))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(heroHeadline(report, metric: metric))
+                        .font(.system(size: 34, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    if period == .today, let delta = TokscaleService.dayOverDay(snapshot.weekDays, metric: metric) {
+                        deltaBadge(delta)
+                    }
+                }
+                Rectangle().fill(.primary.opacity(0.06)).frame(height: 1)
+                HStack {
+                    switch metric {
+                    case .cost:
+                        miniStat(icon: "number",
+                                 text: l10n.tokensPill(Format.tokens(report.totalTokens, settings.unitStyle)))
+                    case .tokens:
+                        miniStat(icon: settings.currency == .cny ? "yensign" : "dollarsign",
+                                 text: cost(report.totalCost))
+                    }
+                    Spacer()
+                    miniStat(icon: "bubble.left.and.bubble.right",
+                             text: l10n.messagesPill(report.totalMessages))
                 }
             }
-            Rectangle().fill(.primary.opacity(0.06)).frame(height: 1)
-            HStack {
-                switch metric {
-                case .cost:
-                    miniStat(icon: "number",
-                             text: l10n.tokensPill(Format.tokens(report.totalTokens, settings.unitStyle)))
-                case .tokens:
-                    miniStat(icon: settings.currency == .cny ? "yensign" : "dollarsign",
-                             text: cost(report.totalCost))
-                }
-                Spacer()
-                miniStat(icon: "bubble.left.and.bubble.right",
-                         text: l10n.messagesPill(report.totalMessages))
-            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
-        .onTapGesture { toggleHeroMetric() }
-        .accessibilityAddTraits(.isButton)
+        .buttonStyle(.plain)
         .accessibilityLabel(l10n.heroTitle(period, metric: metric))
         .card()
     }
@@ -260,72 +261,76 @@ struct PopoverView: View {
         }
         let expanded = expandedSubscription == sub.id
         return VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(sub.name.isEmpty ? l10n.fieldName : sub.name)
-                    .font(.system(size: 11, weight: .semibold))
-                Text(priceText(sub))
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.tertiary)
-                Spacer(minLength: 4)
-                if let multiple {
-                    Text(String(format: "×%.1f", multiple))
-                        .font(.system(size: 10, weight: .bold))
-                        .monospacedDigit()
-                        .foregroundStyle(multiple >= 1 ? Color.brand : .orange)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 2)
-                        .background((multiple >= 1 ? Color.brand : .orange).opacity(0.12), in: Capsule())
-                } else {
-                    Text(l10n.spendUnavailable)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    expandedSubscription = expanded ? nil : sub.id
                 }
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(expanded ? 90 : 0))
+            }) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(sub.name.isEmpty ? l10n.fieldName : sub.name)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(priceText(sub))
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                        Spacer(minLength: 4)
+                        if let multiple {
+                            Text(String(format: "×%.1f", multiple))
+                                .font(.system(size: 10, weight: .bold))
+                                .monospacedDigit()
+                                .foregroundStyle(multiple >= 1 ? Color.brand : .orange)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background((multiple >= 1 ? Color.brand : .orange).opacity(0.12), in: Capsule())
+                        } else {
+                            Text(l10n.spendUnavailable)
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.tertiary)
+                            .rotationEffect(.degrees(expanded ? 90 : 0))
+                    }
+                    if let spend, let multiple {
+                        roiBar(multiple: min(multiple, 1), reached: multiple >= 1)
+                        let cycle = Billing.currentCycle(billingDay: sub.billingDay, now: Date())
+                        let daysLeft = max(0, Dates.calendar.dateComponents(
+                            [.day], from: Dates.calendar.startOfDay(for: Date()),
+                            to: Dates.calendar.startOfDay(for: cycle.end)).day ?? 0)
+                        let startText = Self.roiDateFormatter.string(from: cycle.start)
+                        let endText = Self.roiDateFormatter.string(
+                            from: Dates.calendar.date(byAdding: .day, value: -1, to: cycle.end) ?? cycle.end)
+                        Text(l10n.cycleLine(startText, endText, daysLeft: daysLeft)
+                             + " · " + l10n.cycleSpend + " "
+                             + cost(spend))
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                        // cycleSpend is USD (report costs are USD, like ROI.multiple's
+                        // costUSD); convert back to the sub's currency for display.
+                        let rate = max(settings.usdToCnyRate, 0.01)
+                        let priceUSD = sub.currency == .cny ? sub.price / rate : sub.price
+                        let remaining = max(0, priceUSD - spend)
+                        let remainingText = amountText(
+                            sub.currency == .cny ? remaining * rate : remaining,
+                            currency: sub.currency)
+                        Text(multiple >= 1 ? l10n.brokeEven
+                             : l10n.toBreakEven(remainingText))
+                            .font(.system(size: 9))
+                            .foregroundStyle(multiple >= 1 ? Color.brand : .secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .contentShape(Rectangle())
             }
-            if let spend, let multiple {
-                roiBar(multiple: min(multiple, 1), reached: multiple >= 1)
-                let cycle = Billing.currentCycle(billingDay: sub.billingDay, now: Date())
-                let daysLeft = max(0, Dates.calendar.dateComponents(
-                    [.day], from: Dates.calendar.startOfDay(for: Date()),
-                    to: Dates.calendar.startOfDay(for: cycle.end)).day ?? 0)
-                let startText = Self.roiDateFormatter.string(from: cycle.start)
-                let endText = Self.roiDateFormatter.string(
-                    from: Dates.calendar.date(byAdding: .day, value: -1, to: cycle.end) ?? cycle.end)
-                Text(l10n.cycleLine(startText, endText, daysLeft: daysLeft)
-                     + " · " + l10n.cycleSpend + " "
-                     + cost(spend))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-                // cycleSpend is USD (report costs are USD, like ROI.multiple's
-                // costUSD); convert back to the sub's currency for display.
-                let rate = max(settings.usdToCnyRate, 0.01)
-                let priceUSD = sub.currency == .cny ? sub.price / rate : sub.price
-                let remaining = max(0, priceUSD - spend)
-                let remainingText = amountText(
-                    sub.currency == .cny ? remaining * rate : remaining,
-                    currency: sub.currency)
-                Text(multiple >= 1 ? l10n.brokeEven
-                     : l10n.toBreakEven(remainingText))
-                    .font(.system(size: 9))
-                    .foregroundStyle(multiple >= 1 ? Color.brand : .secondary)
-                    .lineLimit(1)
-            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(sub.name.isEmpty ? l10n.fieldName : sub.name)
             if expanded {
                 subscriptionEditor(sub)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                expandedSubscription = expanded ? nil : sub.id
-            }
-        }
-        .accessibilityAddTraits(.isButton)
     }
 
     /// Payback progress: cost vs price. Green once the sub paid for itself.
@@ -846,51 +851,53 @@ private struct ModelRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Text("\(rank)")
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 12, alignment: .leading)
-                Text(entry.model)
-                    .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Text(entry.client)
-                    .font(.system(size: 8, weight: .semibold))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(.secondary.opacity(0.12), in: Capsule())
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 4)
-                Text(tokensText)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-                Text(costText)
-                    .font(.system(size: 11, weight: .semibold))
-                    .monospacedDigit()
-                    .frame(minWidth: 54, alignment: .trailing)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.tertiary)
-                    .rotationEffect(.degrees(expanded ? 90 : 0))
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background {
-                GeometryReader { geo in
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.primary.opacity(0.05))
-                        .frame(width: geo.size.width * entry.cost / maxCost)
+            Button(action: onToggle) {
+                HStack(spacing: 6) {
+                    Text("\(rank)")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 12, alignment: .leading)
+                    Text(entry.model)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(entry.client)
+                        .font(.system(size: 8, weight: .semibold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(.secondary.opacity(0.12), in: Capsule())
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    Text(tokensText)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                        .monospacedDigit()
+                    Text(costText)
+                        .font(.system(size: 11, weight: .semibold))
+                        .monospacedDigit()
+                        .frame(minWidth: 54, alignment: .trailing)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.tertiary)
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background {
+                    GeometryReader { geo in
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                            .frame(width: geo.size.width * entry.cost / maxCost)
+                    }
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(.primary.opacity(hovering ? 0.05 : 0))
+                }
+                .contentShape(Rectangle())
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(.primary.opacity(hovering ? 0.05 : 0))
-            }
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onToggle)
-            .accessibilityAddTraits(.isButton)
+            .buttonStyle(.plain)
+            .accessibilityLabel(entry.model)
 
             if expanded {
                 detailGrid
