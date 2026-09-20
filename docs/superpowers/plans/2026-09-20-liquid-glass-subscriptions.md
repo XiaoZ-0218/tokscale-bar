@@ -24,6 +24,107 @@
 
 ---
 
+### Task 0: 数字显示格式 — 具体数字选项
+
+**Files:**
+- Modify: `Sources/TokscaleBar/L10n.swift:24-27`（`UnitStyle` 加 `exact` case）
+- Modify: `Sources/TokscaleBar/Tokscale.swift:504-509`（`Format.tokens` 加分支 + 手写千分位）
+- Modify: `Sources/TokscaleBar/PopoverView.swift`（SettingsView 数字单位 picker `.frame(width: 150)` → `210`，容纳 3 段）
+- Test: `Tests/TokscaleBarTests/TokscaleBarTests.swift`（Format 测试区追加，紧跟现有 compact/compactChinese 测试）
+
+**Interfaces:**
+- Consumes: 现有 `UnitStyle`（`L10n.swift:24`）、`Format.tokens(_:_:)`（`Tokscale.swift:504`）
+- Produces: `UnitStyle.exact`（rawValue `"exact"`，旧版本遇到该持久化值回落默认，无迁移）；`Format.tokens(_:, .exact)` 返回千分位完整数字。调用方（菜单栏标题、hero、模型行、tooltip）零改动自动生效。
+
+- [ ] **Step 1: 写失败测试**
+
+在 `Tests/TokscaleBarTests/TokscaleBarTests.swift` 现有 `compactChinese` 测试（约 23-27 行）之后追加：
+
+```swift
+    func testExactTokensKeepFullDigits() {
+        XCTAssertEqual(Format.tokens(0, .exact), "0")
+        XCTAssertEqual(Format.tokens(999, .exact), "999")
+        XCTAssertEqual(Format.tokens(1_234, .exact), "1,234")
+        XCTAssertEqual(Format.tokens(152_000_000, .exact), "152,000,000")
+    }
+```
+
+Run: `swift test --filter testExactTokensKeepFullDigits 2>&1 | tail -3`
+Expected: 编译失败 —— `UnitStyle` 没有 `exact` case
+
+- [ ] **Step 2: 实现**
+
+a) `Sources/TokscaleBar/L10n.swift:24-27` 的 `UnitStyle` 改为：
+
+```swift
+enum UnitStyle: String, CaseIterable, Identifiable {
+    case western, chinese, exact // K/M/B vs 万/亿 vs full digits
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .western: return "K / M / B"
+        case .chinese: return "万 / 亿"
+        case .exact: return "1,234,567"
+        }
+    }
+}
+```
+
+b) `Sources/TokscaleBar/Tokscale.swift` 的 `Format.tokens`（504-509 行）改为：
+
+```swift
+    static func tokens(_ value: Int, _ unit: UnitStyle = .western) -> String {
+        switch unit {
+        case .western: return compact(Double(value))
+        case .chinese: return compactChinese(Double(value))
+        case .exact: return exact(value)
+        }
+    }
+
+    /// Full digits with comma groups (1,234,567). Hand-rolled: no formatter,
+    /// no locale dependence, deterministic in tests.
+    static func exact(_ value: Int) -> String {
+        let digits = String(abs(value))
+        var grouped = ""
+        for (index, char) in digits.enumerated() where index > 0 {
+            if (digits.count - index) % 3 == 0 { grouped += "," }
+            grouped.append(char)
+        }
+        grouped.append(digits.last!) // the loop above skipped index 0; empty string can't reach here (digits is "0" at minimum)
+        return (value < 0 ? "-" : "") + grouped
+    }
+```
+
+实现注意：上面的 `exact` 循环写法容易绕晕，用更直白的等价实现替换：
+
+```swift
+    /// Full digits with comma groups (1,234,567). Hand-rolled: no formatter,
+    /// no locale dependence, deterministic in tests.
+    static func exact(_ value: Int) -> String {
+        let digits = String(abs(value))
+        let grouped = digits.reversed().enumerated().map { index, char in
+            index > 0 && index % 3 == 0 ? "\(char)," : "\(char)"
+        }.reversed().joined()
+        return (value < 0 ? "-" : "") + grouped
+    }
+```
+
+c) `Sources/TokscaleBar/PopoverView.swift` 设置页「数字单位」那一行（`settingRow(l10n.numberUnits)`，约 699-707 行）的 `.frame(width: 150)` 改为 `.frame(width: 210)`。
+
+- [ ] **Step 3: 运行确认通过 + 全量回归**
+
+Run: `swift test --filter testExactTokensKeepFullDigits 2>&1 | tail -3 && swift test 2>&1 | tail -3`
+Expected: 新测试 PASS；全量 70 passed, 2 skipped
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add Sources/TokscaleBar/L10n.swift Sources/TokscaleBar/Tokscale.swift Sources/TokscaleBar/PopoverView.swift Tests/TokscaleBarTests/TokscaleBarTests.swift
+git commit -m "feat: exact-number unit style alongside K/M/B and 万/亿"
+```
+
+---
+
 ### Task 1: Subscription 模型 + 计费周期数学
 
 **Files:**
@@ -1513,7 +1614,7 @@ git commit -m "feat: subscription payback section with inline editor"
 - [ ] **Step 1: 全量构建与测试**
 
 Run: `swift build 2>&1 | tail -1 && swift test 2>&1 | tail -3`
-Expected: Build complete；全部测试通过（69 原有 + 25 新增 = 94，2 skipped）
+Expected: Build complete；全部测试通过（69 原有 + 26 新增 = 95，2 skipped）
 
 - [ ] **Step 2: 截图矩阵**
 
