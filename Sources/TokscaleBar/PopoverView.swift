@@ -200,11 +200,16 @@ struct PopoverView: View {
         return ROI.matchedCost(report.entries, keywords: sub.keywords)
     }
 
+    /// Amount in the subscription's own currency, same formatting as priceText.
+    private func amountText(_ amount: Double, currency: AppCurrency) -> String {
+        let formatted = amount.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", amount)
+            : String(format: "%.2f", amount)
+        return "\(currency.symbol)\(formatted)"
+    }
+
     private func priceText(_ sub: Subscription) -> String {
-        let formatted = sub.price.truncatingRemainder(dividingBy: 1) == 0
-            ? String(format: "%.0f", sub.price)
-            : String(format: "%.2f", sub.price)
-        return "\(sub.currency.symbol)\(formatted)\(l10n.perMonth)"
+        amountText(sub.price, currency: sub.currency) + l10n.perMonth
     }
 
     @ViewBuilder
@@ -294,6 +299,19 @@ struct PopoverView: View {
                      + cost(spend))
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                // cycleSpend is USD (report costs are USD, like ROI.multiple's
+                // costUSD); convert back to the sub's currency for display.
+                let rate = max(settings.usdToCnyRate, 0.01)
+                let priceUSD = sub.currency == .cny ? sub.price / rate : sub.price
+                let remaining = max(0, priceUSD - spend)
+                let remainingText = amountText(
+                    sub.currency == .cny ? remaining * rate : remaining,
+                    currency: sub.currency)
+                Text(multiple >= 1 ? l10n.brokeEven
+                     : l10n.toBreakEven(remainingText))
+                    .font(.system(size: 9))
+                    .foregroundStyle(multiple >= 1 ? Color.brand : .secondary)
                     .lineLimit(1)
             }
             if expanded {
