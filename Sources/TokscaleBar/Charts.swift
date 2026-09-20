@@ -23,14 +23,18 @@ struct BarChart: View {
                                        style: .continuous)
                     .fill(style(for: index))
                     .frame(height: 4 + maxBarHeight * max(value / peak, 0))
-                    .frame(maxWidth: .infinity)
                     .shadow(color: index == highlight ? Color.brand.opacity(0.5) : .clear,
                             radius: 5, y: 1)
-                    .opacity(hovering == nil || hovering == index ? 1 : 0.45)
+                    // Stretch every column to the chart's full height so zero
+                    // bars (4pt tall) keep a hover target; the contentShape
+                    // makes the whole column, not just the bar, tappable.
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .contentShape(Rectangle())
+                    .opacity(hovering == nil || hovering == index ? 1 : 0.45)
                     .onHover { hovering = $0 ? index : nil }
             }
         }
+        .frame(height: 4 + maxBarHeight)
         .animation(.spring(response: 0.45, dampingFraction: 0.82), value: values)
         .animation(.easeOut(duration: 0.1), value: hovering)
         .overlay(alignment: .top) { tooltip }
