@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 extension Color {
@@ -34,8 +35,11 @@ struct CardStyle: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
+            // SwiftUI's `.glassEffect` renders its content invisible inside
+            // this app's hosted popover/preview window (observed on macOS
+            // 27.2), so the card background is the AppKit primitive instead.
             content
-                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .background(GlassCardBackground(cornerRadius: radius))
         } else {
             content
                 .background(Color(nsColor: .controlBackgroundColor),
@@ -57,4 +61,22 @@ struct CardStyle: ViewModifier {
 
 extension View {
     func card(radius: CGFloat = 14) -> some View { modifier(CardStyle(radius: radius)) }
+}
+
+/// AppKit-backed Liquid Glass card background. `NSGlassEffectView` is the
+/// primitive SwiftUI's `glassEffect` wraps, but hosting it directly keeps the
+/// card's content visible in this app (see CardStyle).
+@available(macOS 26.0, *)
+struct GlassCardBackground: NSViewRepresentable {
+    var cornerRadius: CGFloat
+
+    func makeNSView(context: Context) -> NSGlassEffectView {
+        let view = NSGlassEffectView()
+        view.cornerRadius = cornerRadius
+        return view
+    }
+
+    func updateNSView(_ nsView: NSGlassEffectView, context: Context) {
+        nsView.cornerRadius = cornerRadius
+    }
 }
