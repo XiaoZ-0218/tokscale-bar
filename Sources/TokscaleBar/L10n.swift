@@ -122,8 +122,39 @@ struct L10n {
     var detailReasoning: String { zh ? "推理" : "Reasoning" }
     var detailMessages: String { zh ? "消息" : "Messages" }
     var other: String { zh ? "其他" : "Other" }
-    var subscriptions: String { zh ? "订阅" : "Subscriptions" }
     var subscriptionsUnavailable: String { zh ? "订阅暂不可用" : "Subscriptions unavailable" }
+
+    // Subscriptions / ROI
+    var roiTitle: String { zh ? "订阅回本" : "Payback" }
+    var quotas: String { zh ? "配额" : "Quotas" }
+    var addSubscription: String { zh ? "添加订阅" : "Add subscription" }
+    var subscriptionsEmpty: String {
+        zh ? "点 + 添加订阅，自动计算本周期回本倍数"
+           : "Tap + to add a subscription and track its payback"
+    }
+    var perMonth: String { zh ? "/月" : "/mo" }
+    /// "9/15 – 10/14 · 剩 10 天" / "Sep 15 – Oct 14 · 10d left"
+    func cycleLine(_ start: String, _ end: String, daysLeft: Int) -> String {
+        zh ? "\(start) – \(end) · 剩 \(daysLeft) 天" : "\(start) – \(end) · \(daysLeft)d left"
+    }
+    var cycleSpend: String { zh ? "本周期已用" : "Spent this cycle" }
+    func toBreakEven(_ costText: String) -> String {
+        zh ? "还差 \(costText) 回本" : "\(costText) to break even"
+    }
+    var brokeEven: String { zh ? "已回本" : "Paid off" }
+    var spendUnavailable: String { zh ? "花费数据不可用" : "Spend unavailable" }
+    var fieldName: String { zh ? "名称" : "Name" }
+    var fieldPrice: String { zh ? "价格" : "Price" }
+    var fieldBillingDay: String { zh ? "账单日" : "Billing day" }
+    func dayOfMonth(_ day: Int) -> String {
+        zh ? "每月 \(day) 号" : "Day \(day)"
+    }
+    var fieldKeywords: String { zh ? "关键词" : "Keywords" }
+    var keywordsFooter: String {
+        zh ? "逗号分隔，匹配模型/客户端名；留空算全部"
+           : "Comma-separated, matched against model/client names; empty matches everything"
+    }
+    var deleteSubscription: String { zh ? "删除订阅" : "Delete subscription" }
 
     func usageReset(_ metric: UsageMetric) -> String? {
         UsageMetric.resetLabel(resetsAt: metric.resetsAt, locale: locale, zh: zh)

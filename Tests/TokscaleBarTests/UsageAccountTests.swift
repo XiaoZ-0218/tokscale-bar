@@ -133,8 +133,8 @@ final class UsageResetLabelTests: XCTestCase {
 
 final class UsageL10nTests: XCTestCase {
     func testSectionAndUnavailableCopy() {
-        XCTAssertEqual(L10n(language: .zh).subscriptions, "订阅")
-        XCTAssertEqual(L10n(language: .en).subscriptions, "Subscriptions")
+        XCTAssertEqual(L10n(language: .zh).quotas, "配额")
+        XCTAssertEqual(L10n(language: .en).quotas, "Quotas")
         XCTAssertEqual(L10n(language: .zh).subscriptionsUnavailable, "订阅暂不可用")
         XCTAssertEqual(L10n(language: .en).subscriptionsUnavailable, "Subscriptions unavailable")
     }
