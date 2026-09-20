@@ -79,6 +79,9 @@ final class AppModel: ObservableObject {
         guard fetchesLiveData, !isRefreshing else { return }
         isRefreshing = true
         lastError = nil // a new attempt starts; don't show the stale failure
+        // Read on the main thread: replace() and add/update/remove mutate
+        // the array on main, so background lanes must iterate this copy.
+        let subscriptions = subscriptionStore.subscriptions
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
             // Whatever happens below, the refresh button and timer must recover.
@@ -130,7 +133,7 @@ final class AppModel: ObservableObject {
                 // sharing a billing day share the fetch.
                 let now = Date()
                 var keys = Set<CycleKey>()
-                for sub in self.subscriptionStore.subscriptions {
+                for sub in subscriptions {
                     let cycle = Billing.currentCycle(billingDay: sub.billingDay, now: now)
                     keys.insert(CycleKey(since: Dates.dayString(cycle.start),
                                          until: Dates.dayString(now)))
