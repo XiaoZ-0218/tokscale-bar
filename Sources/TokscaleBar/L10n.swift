@@ -150,6 +150,9 @@ struct L10n {
         zh ? "每月 \(day) 号" : "Day \(day)"
     }
     var fieldKeywords: String { zh ? "关键词" : "Keywords" }
+    var placeholderSubName: String { zh ? "Claude Pro" : "Claude Pro" }
+    /// The zh example uses the full-width comma to hint both forms work.
+    var placeholderKeywords: String { zh ? "claude，anthropic" : "claude, anthropic" }
     var keywordsFooter: String {
         zh ? "逗号分隔，匹配模型/客户端名；留空算全部"
            : "Comma-separated, matched against model/client names; empty matches everything"

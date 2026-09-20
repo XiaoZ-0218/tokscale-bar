@@ -346,8 +346,9 @@ struct PopoverView: View {
         .frame(height: 4)
     }
 
-    /// Live-editing form: every change writes straight to the store and
-    /// triggers a refetch so the badge updates immediately.
+    /// Live-editing form: name/price/keyword writes go straight to the store;
+    /// the refetch that refreshes the badge happens on submit (the billing-day
+    /// Stepper refetches on every change).
     private func subscriptionEditor(_ sub: Subscription) -> some View {
         let binding = Binding<Subscription>(
             get: { model.subscriptionStore.subscriptions.first { $0.id == sub.id } ?? sub },
@@ -364,7 +365,7 @@ struct PopoverView: View {
         return VStack(alignment: .leading, spacing: 8) {
             Rectangle().fill(.primary.opacity(0.06)).frame(height: 1)
             editorRow(l10n.fieldName) {
-                TextField("Claude Pro", text: binding.name)
+                TextField(l10n.placeholderSubName, text: binding.name)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11))
                     .onSubmit { model.refresh() }
@@ -392,7 +393,7 @@ struct PopoverView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(l10n.fieldKeywords)
                     .font(.system(size: 10))
-                TextField("claude, anthropic", text: keywordText)
+                TextField(l10n.placeholderKeywords, text: keywordText)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11))
                     .onSubmit { model.refresh() }
