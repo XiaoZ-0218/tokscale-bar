@@ -375,6 +375,13 @@ final class TokscaleService {
         )
     }
 
+    /// Arbitrary inclusive date range, e.g. one subscription's billing cycle.
+    /// Same flags as the built-in last-30-days job.
+    func fetchReport(since: String, until: String) throws -> Report {
+        let data = try run(["--json", "--since", since, "--until", until, "--no-spinner"])
+        return try Self.decode(Report.self, from: data, job: "range", using: JSONDecoder())
+    }
+
     /// Subscription quotas. Kept off `fetchSnapshot` so a usage failure
     /// cannot take down the cost/token dashboard.
     func fetchUsage() throws -> [UsageAccount] {
