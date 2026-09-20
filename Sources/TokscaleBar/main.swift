@@ -295,10 +295,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     /// Applies debug appearance and state flags. Persistence is disabled so
-    /// a debug run never dirties the user's real settings.
+    /// a debug run never dirties the user's real settings or subscriptions.
     private func applyDebugFlags(_ flags: DebugFlags) {
         let settings = model.settings
         settings.persists = false
+        model.subscriptionStore.persists = false
         if let language = flags.language { settings.language = language }
         if let units = flags.units { settings.unitStyle = units }
         if let currency = flags.currency { settings.currency = currency }
